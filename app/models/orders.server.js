@@ -5,6 +5,7 @@ import prisma from "../db.server";
 import { orderRecordFromWebhook, checkoutRecordFromWebhook, trackingFromFulfillment } from "../lib/orders.js";
 import { generateToken, tokenExpiry } from "../lib/tokens.js";
 import { N_ } from "../i18n/core.js";
+import { COD_FILTERS } from "../lib/cod-filters.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -61,13 +62,7 @@ export async function applyFulfillment(shop, payload) {
 
 /* ---------- queues ---------- */
 
-export const COD_FILTERS = {
-  todo: { label: N_("To send"), where: { codStatus: "pending" } },
-  waiting: { label: N_("Waiting for reply"), where: { codStatus: "sent" } },
-  confirmed: { label: N_("Confirmed"), where: { codStatus: "confirmed" } },
-  cancelled: { label: N_("Cancelled"), where: { codStatus: "cancelled" } },
-  no_reply: { label: N_("No reply"), where: { codStatus: "no_reply" } },
-};
+export { COD_FILTERS };
 
 export async function codQueue(shop, filter = "todo", { risk = null } = {}) {
   const f = COD_FILTERS[filter] || COD_FILTERS.todo;
