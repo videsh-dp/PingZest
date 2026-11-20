@@ -14,7 +14,7 @@
     "generate": "shopify app generate",
     "test": "node --test test/*.test.js",
     "test:widgets": "node test/widgets.e2e.mjs",
-    "test:integration": "node --test --test-concurrency=1 test/integration/",
+    "test:integration": "node --test --test-concurrency=1 test/integration/server.test.mjs",
     "prisma": "prisma"
   },
   "engines": {
