@@ -46,7 +46,7 @@ jobs:
         env:
           NODE_ENV: development
 
-      - name: Prisma: validate, generate, create collections and indexes
+      - name: "Prisma — validate, generate, create collections and indexes"
         run: |
           npx prisma validate
           npx prisma generate
