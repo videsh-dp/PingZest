@@ -87,7 +87,7 @@ code { background: #f3f3f3; padding: 1px 5px; border-radius: 4px; }
 
 .wa-banner { padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
 .wa-banner--info { background: var(--wa-info-bg); }
-.wa-banner--attention { background: var(--wa-attention-bg); }
+.wa-banner--attention, .wa-banner--warning { background: var(--wa-attention-bg); }
 .wa-banner--success { background: var(--wa-success-bg); }
 .wa-banner--critical { background: var(--wa-critical-bg); }
 
@@ -319,3 +319,29 @@ code { background: #f3f3f3; padding: 1px 5px; border-radius: 4px; }
 @media (max-width: 1000px) { .wa-tpl-editor { grid-template-columns: 1fr; } .wa-phone { position: static; } }
 @media (max-width: 760px) { .wa-tpl-layout { grid-template-columns: 1fr; } }
 .wa-row-between { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* Plan page */
+.wa-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: start; }
+.wa-plan.is-current { outline: 2px solid var(--wa-green, #008060); }
+.wa-plan__price { font-size: 28px; font-weight: 700; margin: 8px 0 12px; }
+.wa-plan__price .wa-muted { font-size: 14px; font-weight: 400; }
+.wa-plan__list { list-style: none; padding: 0; margin: 0 0 16px; display: grid; gap: 8px; }
+.wa-plan__list li { display: flex; gap: 8px; align-items: baseline; }
+.wa-plan__list li.is-off { color: #8a8a8a; }
+.wa-button--full { width: 100%; justify-content: center; }
+.wa-link--danger { color: #c5280c; margin-top: 12px; display: inline-block; }
+/* Risk badges */
+.wa-risk { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; }
+.wa-risk--low { background: #e3f1df; color: #1a5d36; }
+.wa-risk--medium { background: #fff1d6; color: #7a4f01; }
+.wa-risk--high { background: #fde3dd; color: #8e1f0b; }
+.wa-risk__why { font-size: 12px; color: #616161; margin: 2px 0 0; }
+.wa-locked { color: #616161; font-size: 12px; }
+.wa-risk-filter { margin: 0 0 12px; }
+.wa-chip { padding: 2px 10px; border-radius: 999px; border: 1px solid #d0d0d0; font-size: 13px; text-decoration: none; color: inherit; }
+.wa-chip.is-active { background: #303030; color: #fff; border-color: #303030; }
+.wa-risk__why { margin: 4px 0 0; padding-inline-start: 16px; font-size: 12px; color: #616161; }
+.wa-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 12px; }
+.wa-fieldset:disabled { opacity: 0.55; }
+.wa-h3 { font-size: 14px; margin: 8px 0 0; }
+.wa-check { display: flex; gap: 8px; align-items: center; }

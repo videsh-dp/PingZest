@@ -32,6 +32,9 @@ Work through this before you press "Submit for review".
 
 ## Before real merchants
 - [ ] MongoDB Atlas in production (replica set, backups on, IP access list set)
+- [ ] Pricing in the listing matches `app/lib/plans.js` (Free + Pro $9.99/mo or $99/yr, 7-day trial)
+- [ ] `BILLING_TEST=false` in production; test upgrade, cancel and a failed payment on a dev store first
+- [ ] Reviewers can try Pro: mention in the review notes that test charges are approved free on dev stores
 - [ ] PostHog: `POSTHOG_API_KEY` set, alerts on `$exception` and `privacy_data_request`
 - [ ] Protected customer data form: list PostHog and MongoDB Atlas as processors (no customer data goes to PostHog)
 - [ ] Email the merchant on `customers/data_request` (currently only logged)

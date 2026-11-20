@@ -143,13 +143,13 @@
   /* ---------- language: built-in labels + the merchant's per-language texts ---------- */
 
   var UI = {
-    en: { online: "Online", offline: "Offline", close: "Close", dismiss: "Dismiss", copied: "Copied!", applied: "✓ Applied", discount: "Discount", chat: "Chat on WhatsApp", support: "Support", apply: "Apply", copy: "Copy code" },
-    hi: { online: "ऑनलाइन", offline: "ऑफ़लाइन", close: "बंद करें", dismiss: "हटाएँ", copied: "कॉपी हो गया!", applied: "✓ लग गया", discount: "छूट", chat: "WhatsApp पर चैट करें", support: "सपोर्ट", apply: "लगाएँ", copy: "कोड कॉपी करें" },
-    es: { online: "En línea", offline: "Desconectado", close: "Cerrar", dismiss: "Descartar", copied: "¡Copiado!", applied: "✓ Aplicado", discount: "Descuento", chat: "Chatea por WhatsApp", support: "Soporte", apply: "Aplicar", copy: "Copiar código" },
-    pt: { online: "Online", offline: "Offline", close: "Fechar", dismiss: "Dispensar", copied: "Copiado!", applied: "✓ Aplicado", discount: "Desconto", chat: "Converse no WhatsApp", support: "Suporte", apply: "Aplicar", copy: "Copiar código" },
-    fr: { online: "En ligne", offline: "Hors ligne", close: "Fermer", dismiss: "Ignorer", copied: "Copié !", applied: "✓ Appliqué", discount: "Réduction", chat: "Discuter sur WhatsApp", support: "Support", apply: "Appliquer", copy: "Copier le code" },
-    de: { online: "Online", offline: "Offline", close: "Schließen", dismiss: "Ausblenden", copied: "Kopiert!", applied: "✓ Eingelöst", discount: "Rabatt", chat: "Per WhatsApp chatten", support: "Support", apply: "Einlösen", copy: "Code kopieren" },
-    ar: { online: "متصل", offline: "غير متصل", close: "إغلاق", dismiss: "إخفاء", copied: "تم النسخ!", applied: "✓ تم التطبيق", discount: "خصم", chat: "دردش عبر واتساب", support: "الدعم", apply: "تطبيق", copy: "نسخ الرمز" },
+    en: { powered: "Powered by PingZest", online: "Online", offline: "Offline", close: "Close", dismiss: "Dismiss", copied: "Copied!", applied: "✓ Applied", discount: "Discount", chat: "Chat on WhatsApp", support: "Support", apply: "Apply", copy: "Copy code" },
+    hi: { powered: "PingZest द्वारा संचालित", online: "ऑनलाइन", offline: "ऑफ़लाइन", close: "बंद करें", dismiss: "हटाएँ", copied: "कॉपी हो गया!", applied: "✓ लग गया", discount: "छूट", chat: "WhatsApp पर चैट करें", support: "सपोर्ट", apply: "लगाएँ", copy: "कोड कॉपी करें" },
+    es: { powered: "Con la tecnología de PingZest", online: "En línea", offline: "Desconectado", close: "Cerrar", dismiss: "Descartar", copied: "¡Copiado!", applied: "✓ Aplicado", discount: "Descuento", chat: "Chatea por WhatsApp", support: "Soporte", apply: "Aplicar", copy: "Copiar código" },
+    pt: { powered: "Desenvolvido por PingZest", online: "Online", offline: "Offline", close: "Fechar", dismiss: "Dispensar", copied: "Copiado!", applied: "✓ Aplicado", discount: "Desconto", chat: "Converse no WhatsApp", support: "Suporte", apply: "Aplicar", copy: "Copiar código" },
+    fr: { powered: "Propulsé par PingZest", online: "En ligne", offline: "Hors ligne", close: "Fermer", dismiss: "Ignorer", copied: "Copié !", applied: "✓ Appliqué", discount: "Réduction", chat: "Discuter sur WhatsApp", support: "Support", apply: "Appliquer", copy: "Copier le code" },
+    de: { powered: "Bereitgestellt von PingZest", online: "Online", offline: "Offline", close: "Schließen", dismiss: "Ausblenden", copied: "Kopiert!", applied: "✓ Eingelöst", discount: "Rabatt", chat: "Per WhatsApp chatten", support: "Support", apply: "Einlösen", copy: "Code kopieren" },
+    ar: { powered: "مدعوم من PingZest", online: "متصل", offline: "غير متصل", close: "إغلاق", dismiss: "إخفاء", copied: "تم النسخ!", applied: "✓ تم التطبيق", discount: "خصم", chat: "دردش عبر واتساب", support: "الدعم", apply: "تطبيق", copy: "نسخ الرمز" },
   };
   function L(key) {
     var base = String(page.locale || "en").split("-")[0].toLowerCase();
@@ -326,7 +326,9 @@
       '<div class="wa-chat__tooltip" hidden><button type="button" class="wa-chat__tooltip-text"></button><button type="button" class="wa-chat__tooltip-x" aria-label="' + esc(L("close")) + '">&times;</button></div>' +
       '<div class="wa-chat__popup" hidden role="dialog" aria-label="' + esc((c.popup && c.popup.title) || L("chat")) + '">' +
       '<div class="wa-chat__head"><strong class="wa-chat__title">' + esc(c.popup && c.popup.title) + '</strong><button type="button" class="wa-chat__close" aria-label="' + esc(L("close")) + '">&times;</button></div>' +
-      '<p class="wa-chat__text"></p><ul class="wa-chat__agents"></ul></div>' +
+      '<p class="wa-chat__text"></p><ul class="wa-chat__agents"></ul>' +
+      (config.branding ? '<a class="wa-chat__brand" href="' + esc(config.brandingUrl || "https://apps.shopify.com/pingzest") + '" target="_blank" rel="noopener">' + esc(L("powered")) + "</a>" : "") +
+      "</div>" +
       '<button type="button" class="wa-chat__bubble" aria-expanded="false" aria-label="' + esc(st.label || L("chat")) + '">' + icon(st.icon) +
       (st.label ? '<span class="wa-chat__label">' + esc(st.label) + "</span>" : "") + "</button>";
     document.body.appendChild(root);

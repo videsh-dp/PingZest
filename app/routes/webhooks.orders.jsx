@@ -3,6 +3,7 @@ import { getSettings } from "../models/settings.server";
 import { upsertOrderFromWebhook } from "../models/orders.server";
 import { fetchOrderAsPayload } from "../models/shopify-admin.server";
 import { pickPhone } from "../lib/orders.js";
+import { assessOrder } from "../models/risk.server";
 
 // orders/create: store the order; COD orders get a confirm link token.
 export const action = async ({ request }) => {
@@ -20,6 +21,11 @@ export const action = async ({ request }) => {
     }
   }
 
-  await upsertOrderFromWebhook(shop, data, settings.countryCode);
+  const order = await upsertOrderFromWebhook(shop, data, settings.countryCode);
+  try {
+    await assessOrder(shop, order, data, admin); // COD risk score
+  } catch (e) {
+    console.error("risk score failed", e?.message);
+  }
   return new Response();
 };

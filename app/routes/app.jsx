@@ -5,7 +5,7 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { staffName } from "../lib/shop.js";
-import { getSettings } from "../models/settings.server";
+import { syncPlan } from "../models/billing.server";
 import { adminLocale, dictionaryFor } from "../i18n/server.js";
 import { I18nProvider, useT } from "../i18n/react.jsx";
 import { dirOf } from "../i18n/core.js";
@@ -17,8 +17,9 @@ import styles from "../styles/app.css?url";
 export const links = () => [{ rel: "stylesheet", href: styles }];
 
 export const loader = async ({ request }) => {
-  const { session } = await authenticate.admin(request);
-  const settings = await getSettings(session.shop);
+  const { session, billing, admin } = await authenticate.admin(request);
+  // Keeps the plan in step with Shopify billing (checked at most every 10 minutes; webhooks cover the rest).
+  const settings = await syncPlan(session.shop, billing, admin);
   const locale = adminLocale({ request, session, settings });
   const profile = { plan: settings.plan || "free", app_locale: locale, country_code: settings.countryCode };
   identifyShop(session.shop, profile);
@@ -59,6 +60,7 @@ function Nav() {
         <Link to="/app/updates">{tr("Order updates")}</Link>
         <Link to="/app/templates">{tr("Message templates")}</Link>
         <Link to="/app/settings">{tr("Settings")}</Link>
+        <Link to="/app/plan">{tr("Plan")}</Link>
       </NavMenu>
   );
 }

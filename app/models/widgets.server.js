@@ -4,6 +4,8 @@
 import prisma from "../db.server";
 import { defaultConfig, sanitizeConfig } from "../lib/widget-config.js";
 import { syncConfigMetafield } from "./shopify-admin.server";
+import { getSettings } from "./settings.server";
+import { hasFeature, planOf } from "../lib/plans.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -23,7 +25,7 @@ export async function saveWidgetConfig(shop, admin, input) {
   const config = sanitizeConfig(input);
   let syncError = null;
   try {
-    await syncConfigMetafield(admin, config);
+    await syncConfigMetafield(admin, await forStorefront(shop, config));
   } catch (e) {
     syncError = e?.message || "Could not save to your store";
     console.error("metafield sync failed", syncError);
@@ -31,6 +33,22 @@ export async function saveWidgetConfig(shop, admin, input) {
   const data = { config: JSON.stringify(config), syncError, ...(syncError ? {} : { syncedAt: new Date() }) };
   await prisma.widgetConfig.upsert({ where: { shop }, update: data, create: { shop, ...data } });
   return { config, synced: !syncError, error: syncError };
+}
+
+/** What the storefront gets: the config plus plan-dependent bits (the Free plan shows "Powered by PingZest"). */
+async function forStorefront(shop, config) {
+  const settings = await getSettings(shop);
+  return {
+    ...config,
+    branding: !hasFeature(planOf(settings), "noBranding"),
+    brandingUrl: process.env.PINGZEST_BRAND_URL || "https://apps.shopify.com/pingzest",
+  };
+}
+
+/** Push the stored config again, e.g. after a plan change. */
+export async function resyncWidgets(shop, admin) {
+  const { config } = await getWidgetConfig(shop);
+  return saveWidgetConfig(shop, admin, config);
 }
 
 /* ---------- events from the storefront ---------- */

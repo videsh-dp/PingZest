@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
+import { Link, useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import {
@@ -278,7 +278,10 @@ export default function Templates() {
               </div>
             </details>
           ) : (
-            <p className="wa-warn wa-small">{tr("You've used all {limit} custom templates on the Free plan. Delete one, or upgrade to PingZest Pro for unlimited templates.", { limit: allowance.limit })}</p>
+            <p className="wa-warn wa-small">
+              {tr("You've used all {limit} custom templates on the Free plan. Delete one, or upgrade to PingZest Pro for unlimited templates.", { limit: allowance.limit })}{" "}
+              <Link to="/app/plan">{tr("See Pro")}</Link>
+            </p>
           )}
           {allowance.limit != null && (
             <p className="wa-muted wa-small">

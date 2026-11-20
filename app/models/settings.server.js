@@ -32,6 +32,22 @@ export async function saveSettings(shop, form) {
     cancelledTag: tag(form.cancelledTag, "wa-cod-cancelled"),
     abandonDelayMin,
   };
+  // Pro settings are only sent when the shop is on Pro (the fields are disabled otherwise).
+  if (form.proSettings) {
+    const num = (v, min, max, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
+    };
+    Object.assign(data, {
+      riskTagHigh: form.riskTagHigh === "on",
+      riskTag: tag(form.riskTag, "pingzest-risk-high"),
+      prepaidEnabled: form.prepaidEnabled === "on",
+      prepaidPercent: num(form.prepaidPercent, 0, 30, 5),
+      prepaidMaxAmount: num(form.prepaidMaxAmount, 0, 1_000_000, 0),
+      prepaidTag: tag(form.prepaidTag, "pingzest-cod-to-prepaid"),
+      addressCheck: form.addressCheck === "on",
+    });
+  }
   const settings = await prisma.shopSettings.upsert({ where: { shop }, update: data, create: { shop, ...data } });
   return { settings };
 }

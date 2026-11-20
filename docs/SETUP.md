@@ -82,9 +82,9 @@ On development stores it works right away. Shopify reviews it when you submit to
 ## 6. Run the tests
 
 ```bash
-npm test                         # 87 unit tests (no Shopify needed)
+npm test                         # 96 unit tests (no Shopify needed)
 npx playwright install chromium  # once
-npm run test:widgets             # 19 browser checks of the storefront widgets
+npm run test:widgets             # 20 browser checks of the storefront widgets
 ```
 
 ## 7. Deploy to production
@@ -106,9 +106,11 @@ have Mumbai) if most of your merchants are in India.
    | `SHOPIFY_API_KEY` | Client ID (Dev Dashboard → your app) |
    | `SHOPIFY_API_SECRET` | Client secret |
    | `SHOPIFY_APP_URL` | Your server's public URL, e.g. `https://pingzest.onrender.com` |
-   | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales` |
+   | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales,write_order_edits` |
    | `DATABASE_URL` | Your MongoDB Atlas connection string, ending in `/pingzest?...` |
    | `NODE_ENV` | `production` |
+   | `BILLING_TEST` | `true` while testing; `false` once the app is public, to take real payments |
+   | `SHOPIFY_APP_HANDLE` | Your app's handle (Partner Dashboard → App setup → URL), used to return merchants to the Plan page after paying |
    | `POSTHOG_API_KEY` | Optional but recommended. PostHog → Project settings → Project API key (`phc_…`). Logs every request, error and API call, and powers feature flags |
    | `POSTHOG_HOST` | `https://us.i.posthog.com` (or `https://eu.i.posthog.com` for an EU project) |
    | `GOOGLE_TRANSLATE_API_KEY` | Optional. Shows the "Auto-translate" / "Translate" buttons. Google Cloud → enable *Cloud Translation API* → Credentials → API key (restrict it to that API) |

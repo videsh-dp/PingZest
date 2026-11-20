@@ -35,7 +35,19 @@ model ShopSettings {
   countryCode      String   @default("91")
   defaultLang      String   @default("en") // default message language (any app locale code)
   appLocale        String   @default("auto") // admin language: "auto" = follow Shopify admin
-  plan             String   @default("free") // free | pro (see app/lib/plans.js)
+  plan             String   @default("free") // free | pro (see app/lib/plans.js), synced from Shopify billing
+  subscriptionId   String? // Shopify AppSubscription gid
+  subscriptionName String? // e.g. "PingZest Pro Monthly"
+  trialEndsAt      DateTime?
+  planCheckedAt    DateTime?
+  // COD money-savers (Pro)
+  riskTagHigh      Boolean  @default(true)  // add a tag to high-risk COD orders in Shopify
+  riskTag          String   @default("pingzest-risk-high")
+  prepaidEnabled   Boolean  @default(false) // offer "pay online now" on the confirm page
+  prepaidPercent   Float    @default(5)     // discount for paying online, 0 = none
+  prepaidMaxAmount Float    @default(0)     // cap on the discount in the order currency, 0 = no cap
+  prepaidTag       String   @default("pingzest-cod-to-prepaid")
+  addressCheck     Boolean  @default(true)  // let customers fix their address on the confirm page
   confirmedTag     String   @default("wa-cod-confirmed")
   cancelledTag     String   @default("wa-cod-cancelled")
   abandonDelayMin  Int      @default(30)
@@ -102,6 +114,20 @@ model Order {
                                // unique index would allow only one order without a token)
   tokenExpiresAt     DateTime?
 
+  // COD risk score (app/lib/risk.js). Only the PIN code and yes/no address checks are stored.
+  pincode            String?
+  addressFlags       String[]
+  riskScore          Int?
+  riskLevel          String? // low | medium | high
+  riskReasons        Json?   // [{ code, vars }]
+
+  // COD → prepaid (Pro)
+  prepaidOfferedAt   DateTime? // customer opened the payment link
+  prepaidDiscount    String?   // discount applied for paying online
+  paidAt             DateTime? // orders/paid received
+  convertedToPrepaid Boolean   @default(false)
+  addressUpdatedAt   DateTime? // customer fixed the address on the confirm page
+
   // Order updates
   trackingUrl        String?
   shippedAt          DateTime?
@@ -114,6 +140,9 @@ model Order {
 
   @@unique([shop, shopifyOrderId])
   @@index([shop, isCod, codStatus])
+  @@index([shop, isCod, riskLevel])
+  @@index([shop, phone])
+  @@index([shop, pincode])
   @@index([confirmToken])
 }
 

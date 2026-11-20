@@ -220,3 +220,6 @@
   .wa-chat--pulse .wa-chat__bubble::after { animation: none; display: none; }
   .wa-chat__bubble, .wa-btn { transition: none; }
 }
+
+.wa-chat__brand { display: block; margin: 8px 0 0; font-size: 11px; color: #667781; text-align: center; text-decoration: none; }
+.wa-chat__brand:hover { text-decoration: underline; }

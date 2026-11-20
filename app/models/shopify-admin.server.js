@@ -90,8 +90,8 @@ export async function fetchOrderAsPayload(admin, orderGid) {
         id legacyResourceId name phone statusPageUrl paymentGatewayNames
         totalPriceSet { shopMoney { amount currencyCode } }
         customer { firstName phone }
-        shippingAddress { firstName phone }
-        billingAddress { firstName phone }
+        shippingAddress { firstName lastName phone address1 address2 zip countryCodeV2 }
+        billingAddress { firstName lastName phone address1 address2 zip countryCodeV2 }
         customAttributes { key value }
         discountCodes
         totalDiscountsSet { shopMoney { amount } }
@@ -112,8 +112,8 @@ export async function fetchOrderAsPayload(admin, orderGid) {
     total_price: o.totalPriceSet?.shopMoney?.amount,
     currency: o.totalPriceSet?.shopMoney?.currencyCode,
     customer: { first_name: o.customer?.firstName, phone: o.customer?.phone },
-    shipping_address: { first_name: o.shippingAddress?.firstName, phone: o.shippingAddress?.phone },
-    billing_address: { first_name: o.billingAddress?.firstName, phone: o.billingAddress?.phone },
+    shipping_address: addressPayload(o.shippingAddress),
+    billing_address: addressPayload(o.billingAddress),
     note_attributes: (o.customAttributes || []).map((a) => ({ name: a.key, value: a.value })),
     line_items: (o.lineItems?.nodes || []).map((li) => ({ title: li.title, quantity: li.quantity })),
     discount_codes: (o.discountCodes || []).map((code) => ({ code })),
@@ -233,4 +233,93 @@ export async function getShopLocales(admin) {
     console.error("shopLocales failed", e?.message);
     return null; // unknown (e.g. scope not granted yet)
   }
+}
+
+function addressPayload(a) {
+  if (!a) return null;
+  return { first_name: a.firstName, last_name: a.lastName, phone: a.phone, address1: a.address1, address2: a.address2, zip: a.zip, country_code: a.countryCodeV2 };
+}
+
+/* ---------- confirm page: address check and COD → prepaid (Pro) ---------- */
+
+/** What the confirm page needs, read live (the address is never stored by PingZest). */
+export async function fetchOrderForConfirm(admin, orderGid) {
+  const res = await callAdmin(admin, `#graphql
+    query orderForConfirm($id: ID!) {
+      order(id: $id) {
+        id cancelledAt displayFinancialStatus displayFulfillmentStatus
+        currentTotalPriceSet { shopMoney { amount currencyCode } }
+        currentSubtotalPriceSet { shopMoney { amount currencyCode } }
+        totalOutstandingSet { shopMoney { amount currencyCode } }
+        paymentCollectionDetails { additionalPaymentCollectionUrl }
+        shippingAddress { firstName lastName company address1 address2 city provinceCode province zip countryCodeV2 country phone }
+      }
+    }`, { variables: { id: orderGid } });
+  return (await res.json()).data?.order || null;
+}
+
+/** Customer's own fix of their delivery address (only the street lines, city and PIN code change). */
+export async function updateShippingAddress(admin, orderGid, current, changes) {
+  const address = {
+    firstName: current?.firstName || undefined,
+    lastName: current?.lastName || undefined,
+    company: current?.company || undefined,
+    phone: current?.phone || undefined,
+    countryCode: current?.countryCodeV2 || undefined,
+    provinceCode: current?.provinceCode || undefined,
+    address1: changes.address1,
+    address2: changes.address2,
+    city: changes.city,
+    zip: changes.zip,
+  };
+  const res = await callAdmin(admin, `#graphql
+    mutation fixAddress($input: OrderInput!) {
+      orderUpdate(input: $input) { order { id } userErrors { field message } }
+    }`, { variables: { input: { id: orderGid, shippingAddress: address } } });
+  const json = await res.json();
+  const errors = json.data?.orderUpdate?.userErrors || [];
+  if (errors.length) throw new Error(errors.map((e) => e.message).join("; "));
+  return true;
+}
+
+/**
+ * Discount for paying online: an order edit that takes `percent` off every line item (lowered so the
+ * total discount stays within `maxAmount` if set). The customer isn't emailed about the edit.
+ * Returns the discount amount applied.
+ */
+export async function applyPrepaidDiscount(admin, orderGid, { percent, maxAmount, subtotal, description }) {
+  if (!percent || percent <= 0) return 0;
+  let pct = percent;
+  if (maxAmount > 0 && subtotal > 0 && (subtotal * percent) / 100 > maxAmount) pct = Math.floor(((maxAmount / subtotal) * 100) * 100) / 100;
+  if (pct <= 0) return 0;
+
+  const begin = await (await callAdmin(admin, `#graphql
+    mutation beginEdit($id: ID!) {
+      orderEditBegin(id: $id) {
+        calculatedOrder { id lineItems(first: 100) { nodes { id quantity } } }
+        userErrors { field message }
+      }
+    }`, { variables: { id: orderGid } })).json();
+  const calc = begin.data?.orderEditBegin?.calculatedOrder;
+  const beginErrors = begin.data?.orderEditBegin?.userErrors || [];
+  if (!calc || beginErrors.length) throw new Error(beginErrors.map((e) => e.message).join("; ") || "Could not edit the order");
+
+  for (const li of calc.lineItems.nodes.filter((l) => l.quantity > 0)) {
+    const r = await (await callAdmin(admin, `#graphql
+      mutation discountLine($id: ID!, $lineItemId: ID!, $discount: OrderEditAppliedDiscountInput!) {
+        orderEditAddLineItemDiscount(id: $id, lineItemId: $lineItemId, discount: $discount) { userErrors { field message } }
+      }`, { variables: { id: calc.id, lineItemId: li.id, discount: { percentValue: pct, description } } })).json();
+    const errs = r.data?.orderEditAddLineItemDiscount?.userErrors || [];
+    if (errs.length) throw new Error(errs.map((e) => e.message).join("; "));
+  }
+
+  const commit = await (await callAdmin(admin, `#graphql
+    mutation commitEdit($id: ID!) {
+      orderEditCommit(id: $id, notifyCustomer: false, staffNote: "PingZest: discount for paying online instead of cash on delivery") {
+        order { id } userErrors { field message }
+      }
+    }`, { variables: { id: calc.id } })).json();
+  const commitErrors = commit.data?.orderEditCommit?.userErrors || [];
+  if (commitErrors.length) throw new Error(commitErrors.map((e) => e.message).join("; "));
+  return Math.round(subtotal * pct) / 100;
 }

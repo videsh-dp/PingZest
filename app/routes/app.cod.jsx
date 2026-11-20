@@ -1,4 +1,7 @@
-import { useLoaderData, useSearchParams } from "react-router";
+import { Link, useLoaderData, useSearchParams } from "react-router";
+import { hasFeature, planOf } from "../lib/plans.js";
+import { REASONS } from "../lib/risk.js";
+import { riskTeaser } from "../models/risk.server";
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
@@ -10,6 +13,7 @@ import { useT } from "../i18n/react.jsx";
 
 import prisma from "../db.server";
 import { toId } from "../lib/ids.js";
+import { N_ } from "../i18n/core.js";
 import {
   Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState,
   useQueueTemplate, TemplatePicker,
@@ -18,17 +22,24 @@ import {
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const filter = new URL(request.url).searchParams.get("filter") || "todo";
-  const [settings, templates, rows, counts] = await Promise.all([
-    getSettings(shop),
+  const url = new URL(request.url);
+  const filter = url.searchParams.get("filter") || "todo";
+  const settings = await getSettings(shop);
+  const pro = hasFeature(planOf(settings), "codRisk");
+  const risk = pro && ["high", "medium", "low"].includes(url.searchParams.get("risk")) ? url.searchParams.get("risk") : null;
+  const [templates, rows, counts, teaser] = await Promise.all([
     listTemplates(shop),
-    codQueue(shop, filter),
+    codQueue(shop, filter, { risk }),
     prisma.order.groupBy({ by: ["codStatus"], where: { shop, isCod: true }, _count: { _all: true } }),
+    pro ? null : riskTeaser(shop),
   ]);
   const lang = pickLang(request, settings);
   const countBy = Object.fromEntries(counts.map((c) => [c.codStatus, c._count._all]));
   return {
     lang,
+    pro,
+    risk,
+    teaser,
     templates: templatesFor(templates, "cod_confirm"),
     langs: [...new Set(templates.filter((t) => t.type === "cod_confirm").map((t) => t.lang))],
     counts: {
@@ -45,6 +56,10 @@ export const loader = async ({ request }) => {
       sentAt: o.codSentAt,
       respondedBy: o.codRespondedBy,
       optIn: o.whatsappOptIn,
+      // Risk details are only sent to the page on Pro.
+      risk: pro && o.riskLevel ? { level: o.riskLevel, score: o.riskScore, reasons: (o.riskReasons || []).slice(0, 3) } : null,
+      paidOnline: o.convertedToPrepaid,
+      addressFixed: Boolean(o.addressUpdatedAt),
       ...codRowData(o, settings),
     })),
   };
@@ -78,13 +93,34 @@ export const action = async ({ request }) => {
   return { ok: false };
 };
 
+const RISK_LABELS = { high: N_("High risk"), medium: N_("Medium risk"), low: N_("Low risk") };
+
+function RiskBadge({ risk }) {
+  const tr = useT();
+  return (
+    <div>
+      <span className={`wa-risk wa-risk--${risk.level}`} title={tr("Risk score {score}/100", { score: risk.score })}>{tr(RISK_LABELS[risk.level])}</span>
+      {risk.level !== "low" && risk.reasons.length > 0 && (
+        <ul className="wa-risk__why">
+          {risk.reasons.filter((x) => x.code !== "phone_good").map((x) => <li key={x.code}>{tr(REASONS[x.code] || x.code, x.vars)}</li>)}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 export default function CodQueue() {
   const tr = useT();
-  const { rows, counts, lang, templates, langs } = useLoaderData();
+  const { rows, counts, lang, templates, langs, pro, risk, teaser } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
   const filter = params.get("filter") || "todo";
+  const riskLink = (level) => {
+    const p = new URLSearchParams(params);
+    if (level) p.set("risk", level); else p.delete("risk");
+    return `?${p}`;
+  };
   const tabs = Object.entries(COD_FILTERS).map(([id, f]) => ({ id, label: tr(f.label), count: counts[id] }));
 
   return (
@@ -94,6 +130,20 @@ export default function CodQueue() {
       actions={<div className="wa-row-gap"><TemplatePicker templates={forLang} chosen={chosen} /><LangSwitch lang={lang} langs={langs} /></div>}
     >
       <Tabs tabs={tabs} />
+      {pro ? (
+        <div className="wa-row-gap wa-risk-filter" role="group" aria-label={tr("Risk")}>
+          <span className="wa-muted wa-small">{tr("Risk")}:</span>
+          <Link className={!risk ? "wa-chip is-active" : "wa-chip"} to={riskLink(null)}>{tr("All")}</Link>
+          {["high", "medium", "low"].map((l) => (
+            <Link key={l} className={risk === l ? "wa-chip is-active" : "wa-chip"} to={riskLink(l)}>{tr(RISK_LABELS[l])}</Link>
+          ))}
+        </div>
+      ) : teaser?.high > 0 ? (
+        <div className="wa-banner wa-banner--warning">
+          {tr.plural("{count} COD order in the last 30 days looked risky.", "{count} COD orders in the last 30 days looked risky.", teaser.high)}{" "}
+          <Link to="/app/plan">{tr("See which ones with Pro")}</Link>
+        </div>
+      ) : null}
       <Card>
         {rows.length === 0 ? (
           <EmptyState title={filter === "todo" ? tr("All caught up 🎉") : tr("Nothing here yet")}>
@@ -119,6 +169,9 @@ export default function CodQueue() {
                   <td>{r.amount}</td>
                   <td>
                     <StatusBadge status={r.status} />
+                    {r.risk && <RiskBadge risk={r.risk} />}
+                    {r.paidOnline && <div><span className="wa-badge wa-badge--success">{tr("Paid online")}</span></div>}
+                    {r.addressFixed && <div className="wa-muted">{tr("Address updated by customer")}</div>}
                     {r.sentAt && r.status === "sent" && <div className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</div>}
                     {r.respondedBy === "customer" && <div className="wa-muted">{tr("by customer")}</div>}
                   </td>

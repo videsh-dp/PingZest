@@ -12,7 +12,8 @@ include_config_on_deploy = true
 # read_orders also covers checkouts (abandoned checkouts) and fulfillments webhooks.
 # write_orders lets the confirm page tag orders "wa-cod-confirmed" / "wa-cod-cancelled".
 # read/write_discounts let merchants create discount codes for the discount banner.
-scopes = "read_orders,write_orders,read_discounts,write_discounts,read_locales"
+# write_order_edits applies the "pay online and save" discount to a COD order (Pro).
+scopes = "read_orders,write_orders,read_discounts,write_discounts,read_locales,write_order_edits"
 
 [auth]
 redirect_urls = ["https://example.com/auth/callback"]
@@ -31,6 +32,16 @@ api_version = "2026-10"
   [[webhooks.subscriptions]]
   topics = ["orders/create"]
   uri = "/webhooks/orders"
+
+  # Payment received (used to detect COD orders switched to prepaid)
+  [[webhooks.subscriptions]]
+  topics = ["orders/paid"]
+  uri = "/webhooks/orders-paid"
+
+  # Plan changes: subscribe, cancel, payment failed
+  [[webhooks.subscriptions]]
+  topics = ["app_subscriptions/update"]
+  uri = "/webhooks/app/subscriptions_update"
 
   [[webhooks.subscriptions]]
   topics = ["checkouts/create", "checkouts/update"]

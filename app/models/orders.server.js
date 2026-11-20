@@ -69,10 +69,10 @@ export const COD_FILTERS = {
   no_reply: { label: N_("No reply"), where: { codStatus: "no_reply" } },
 };
 
-export async function codQueue(shop, filter = "todo") {
+export async function codQueue(shop, filter = "todo", { risk = null } = {}) {
   const f = COD_FILTERS[filter] || COD_FILTERS.todo;
   return prisma.order.findMany({
-    where: { shop, isCod: true, ...f.where },
+    where: { shop, isCod: true, ...f.where, ...(risk ? { riskLevel: risk } : {}) },
     orderBy: { createdAt: filter === "todo" ? "asc" : "desc" },
     take: 100,
   });

@@ -333,6 +333,19 @@ try {
     assert.match(await p2.textContent(".wa-disc"), /Copy code/);
     await p.screenshot({ path: path.join(shotDir, "storefront-ar.png") });
   });
+
+  await check("Free plan shows “Powered by PingZest” in the chat popup; Pro doesn't", async () => {
+    const { page: p } = await newPage();
+    await p.goto(scenario("brand-free", (c) => { c.branding = true; c.chat.tooltip.enabled = false; }));
+    await p.click(".wa-chat__bubble");
+    await p.waitForSelector(".wa-chat__popup:not([hidden])");
+    assert.equal((await p.textContent(".wa-chat__brand"))?.trim(), "Powered by PingZest");
+    const { page: p2 } = await newPage();
+    await p2.goto(scenario("brand-pro", (c) => { c.branding = false; c.chat.tooltip.enabled = false; }));
+    await p2.click(".wa-chat__bubble");
+    await p2.waitForSelector(".wa-chat__popup:not([hidden])");
+    assert.equal(await p2.$(".wa-chat__brand"), null);
+  });
 } finally {
   await browser.close();
   server.close();

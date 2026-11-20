@@ -2,6 +2,8 @@ import { Link, useLoaderData, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
 import { widgetAnalytics } from "../models/widgets.server";
 import { messageAnalytics } from "../models/orders.server";
+import { prepaidStats } from "../models/prepaid.server";
+import { riskTeaser } from "../models/risk.server";
 import { KINDS } from "../lib/message-stats.js";
 import { PAGE_TYPES } from "../lib/widget-config.js";
 import { Page, Card, Stat, Tabs, EmptyState } from "../components/ui";
@@ -14,8 +16,10 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const d = parseInt(new URL(request.url).searchParams.get("days"), 10);
   const days = [7, 30, 90].includes(d) ? d : 30;
-  const [widgets, messages] = await Promise.all([widgetAnalytics(session.shop, days), messageAnalytics(session.shop, days)]);
-  return { ...widgets, messages };
+  const [widgets, messages, prepaid, risk] = await Promise.all([
+    widgetAnalytics(session.shop, days), messageAnalytics(session.shop, days), prepaidStats(session.shop, days), riskTeaser(session.shop, days),
+  ]);
+  return { ...widgets, messages: { ...messages, prepaid, risk } };
 };
 
 function MessagesView({ m }) {
@@ -70,6 +74,14 @@ function MessagesView({ m }) {
           </ol>
           <p className="wa-muted">{tr("Every cancelled COD order is a parcel you didn't ship and pay to get back.")}</p>
         </Card>
+      </div>
+
+      <div className="wa-grid wa-grid--2">
+        <Stat label={tr("Switched to prepaid")} value={tr.n(m.prepaid.converted)}
+          hint={m.prepaid.converted
+            ? tr("{amount} no longer at risk of a COD return · {discount} given as discount", { amount: tr.money(m.prepaid.value, m.prepaid.currency), discount: tr.money(m.prepaid.discounts, m.prepaid.currency) })
+            : tr("{count} customers opened the payment link", { count: tr.n(m.prepaid.offered) })} />
+        <Stat label={tr("Risky COD orders")} value={tr.n(m.risk.high)} hint={tr("{count} medium risk", { count: tr.n(m.risk.medium) })} />
       </div>
 
       {showTemplatePerformance && (

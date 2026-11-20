@@ -18,6 +18,7 @@ import widgetJs from "../../extensions/pingzest-widgets/assets/wa-widget.js?raw"
 import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
 import { trackCall, flagOn } from "../posthog.server";
 import { useFlag } from "../components/flags.jsx";
+import { hasFeature, planOf } from "../lib/plans.js";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
@@ -40,6 +41,7 @@ export const loader = async ({ request }) => {
     knownLanguages: Boolean(shopLocales),
     mainLanguage: shopLocales?.find((l) => l.primary)?.locale || "en",
     canTranslate: translationEnabled() && (await flagOn(shop, "google-translate")),
+    branding: !hasFeature(planOf(settings), "noBranding"),
     storeName: settings.storeName || "Your Store",
     discounts: discounts.filter((d) => d.active).map((d) => ({ code: d.code, label: `${d.code} · ${describeDiscount(d)}` })),
     links: {
@@ -194,7 +196,7 @@ export default function Widgets() {
 
   // Rebuild the preview shortly after edits stop
   useEffect(() => {
-    const t = setTimeout(() => setSrcDoc(previewHtml({ config, pageType, storeName: data.storeName, css: widgetCss, js: widgetJs, locale: previewLang })), 250);
+    const t = setTimeout(() => setSrcDoc(previewHtml({ config: { ...config, branding: data.branding }, pageType, storeName: data.storeName, css: widgetCss, js: widgetJs, locale: previewLang })), 250);
     return () => clearTimeout(t);
   }, [config, pageType, data.storeName, previewLang]);
 

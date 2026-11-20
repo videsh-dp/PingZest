@@ -1,7 +1,8 @@
 import "@shopify/shopify-app-react-router/adapters/node";
-import { ApiVersion, AppDistribution, shopifyApp } from "@shopify/shopify-app-react-router/server";
+import { ApiVersion, AppDistribution, BillingInterval, shopifyApp } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
+import { BILLING_PLANS, TRIAL_DAYS } from "./lib/plans.js";
 
 // Use the newest version your installed @shopify/shopify-app-react-router offers.
 const apiVersion =
@@ -19,6 +20,16 @@ const shopify = shopifyApp({
   // Online tokens identify the staff member who's signed in (name shown in the app).
   // Shopify still stores an offline token at install for webhooks and the public confirm page.
   useOnlineTokens: true,
+  // Paid plans (prices in app/lib/plans.js). Charged through Shopify, on the merchant's Shopify bill.
+  billing: Object.fromEntries(
+    Object.entries(BILLING_PLANS).map(([name, p]) => [
+      name,
+      {
+        trialDays: TRIAL_DAYS,
+        lineItems: [{ amount: p.amount, currencyCode: p.currency, interval: p.interval === "ANNUAL" ? BillingInterval.Annual : BillingInterval.Every30Days }],
+      },
+    ]),
+  ),
   ...(process.env.SHOP_CUSTOM_DOMAIN ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] } : {}),
 });
 

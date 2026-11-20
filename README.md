@@ -42,7 +42,8 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 [analytics](docs/screenshots/analytics.png) · [discounts](docs/screenshots/discounts.png) · [COD queue](docs/screenshots/cod.png) ·
 [templates](docs/screenshots/templates.png) · [confirm page](docs/screenshots/confirm.png) ·
 [analytics in Spanish](docs/screenshots/analytics-es.png) · [templates in Arabic](docs/screenshots/templates-ar.png) ·
-[storefront in Arabic](docs/screenshots/storefront-ar.png) · [confirm page in Arabic](docs/screenshots/confirm-ar.png)
+[storefront in Arabic](docs/screenshots/storefront-ar.png) · [confirm page in Arabic](docs/screenshots/confirm-ar.png) ·
+[Plan page](docs/screenshots/plan.png) · [COD risk score](docs/screenshots/cod-risk.png) · [confirm page with Pro](docs/screenshots/confirm-pro.png)
 
 ## How widget settings reach the store
 
@@ -119,11 +120,42 @@ roll it out to some stores (by shop domain, plan or %). Flags are read on the se
 render with the right features, and are available in components with `useFlag("key")` and in loaders with
 `flagOn(shop, "key")`. Current flags: `google-translate`, `widget-languages-tab`, `template-performance`.
 
-## Plans
+## Plans and billing
 
-`app/lib/plans.js`. **Free:** 5 custom message templates; the built-in Standard template for every stage and language
-is always included and doesn't count. **Pro:** unlimited. Billing isn't built yet; to upgrade a store by hand set
-`plan: "pro"` on its `ShopSettings` document in MongoDB.
+Prices and features are in `app/lib/plans.js`; Shopify bills the merchant on their Shopify invoice (Billing API).
+
+| | Free | Pro — $9.99/month or $99/year, 7-day trial |
+|---|---|---|
+| Widgets, COD queue, cart and order messages, analytics, 7 languages | ✓ | ✓ |
+| Custom message templates (Standard templates always included) | 5 | Unlimited |
+| **COD risk score** (Low / Medium / High with reasons; filter; Shopify tag) | count only | ✓ |
+| **COD → prepaid** (confirm page: "pay online now and save X%") | – | ✓ |
+| **Address check** (confirm page: customer fixes the address or adds a landmark) | – | ✓ |
+| "Powered by PingZest" in the chat popup | shown | hidden |
+
+- **Plan page** (`/app/plan`): compare, start the trial (Shopify's approval page), cancel.
+- **Staying in sync:** `app_subscriptions/update` webhook plus a check at most every 10 minutes when the app opens.
+  FROZEN (payment failed), cancelled or expired → Free; widgets are re-published so the branding line follows the plan.
+- **Test charges:** on until `BILLING_TEST=false`. Development stores can only approve test charges.
+- **Return URL** after approval uses `SHOPIFY_APP_HANDLE` (the app's handle in the Partner Dashboard, default `pingzest`).
+- **Upgrade a store by hand** (e.g. a friend's store): set `plan: "pro"` on its `ShopSettings` in MongoDB. The next
+  billing check moves it back to Free if it has no subscription, so for a permanent comp give it a 100% discount in
+  the Partner Dashboard instead.
+
+### COD money-savers (Pro)
+
+- **Risk score** (`app/lib/risk.js`): scored when a COD order arrives (all plans, so it's ready on upgrade). Signals:
+  earlier cancellations / no replies / confirmations from the same phone, several orders from one number in 24 h,
+  PIN code cancellation rate (from 5 orders), order value vs the store's median (from 10 orders), and address checks
+  (too short, no house number, fake/test words, invalid PIN, fake name). High ≥ 60, Medium ≥ 30. Only the PIN code and
+  yes/no flags are stored, never the address.
+- **COD → prepaid** (`app/lib/prepaid.js`): the confirm page offers online payment when the order is unpaid, unshipped
+  and Shopify has a payment link for it. Tapping it applies the discount as an order edit (items only, capped by the
+  maximum) and redirects to Shopify's own payment page for that order. `orders/paid` marks it converted, confirms it,
+  and adds the tag. Needs an online payment method in the store and the `write_order_edits` scope.
+- **Address check:** the confirm page reads the address live from Shopify and lets the customer change the street lines,
+  city and PIN code (`orderUpdate`).
+- Settings → **COD money-savers (Pro)**: risk tag, prepaid on/off, discount %, maximum, tag, address check on/off.
 
 ## Privacy requests
 
@@ -180,12 +212,12 @@ Also check `ApiVersion` in `app/shopify.server.js` and `api_version` in `shopify
 ## Tests
 
 ```bash
-npm test                 # 87 unit tests: phone cleanup, templates (picking, validation), WhatsApp
+npm test                 # 96 unit tests: phone cleanup, templates (picking, validation), WhatsApp
                          # formatting, links, order parsing, tokens, widget settings, page rules,
                          # discount form, message analytics, store-address login input, languages
                          # (every string translated, placeholders and plurals intact, Intl formatting),
                          # PostHog logging (redaction, batching, flags, request middleware), plan limits
-npm run test:widgets     # 19 browser checks of the storefront: designs, mobile, page rules, banner,
+npm run test:widgets     # 20 browser checks of the storefront: designs, mobile, page rules, banner,
                          # copy/apply, tracking, shopper language and right-to-left (needs `npx playwright install chromium`)
 ```
 

@@ -35,3 +35,18 @@ body {
 .cf__btn:disabled { opacity: 0.6; }
 .cf__note { background: #fff4d6; padding: 10px 12px; border-radius: 10px; font-size: 14px; }
 .cf__chat { display: block; text-align: center; margin-top: 18px; color: #1f8f4e; font-weight: 600; }
+
+/* Pro: pay online, address check */
+.cf__h2 { font-size: 17px; margin: 0 0 4px; }
+.cf__pay { margin-top: 18px; padding: 14px; border-radius: 14px; background: #eef6ff; border: 1px solid #cfe3fb; display: grid; gap: 8px; }
+.cf__pay .cf__lead { margin: 0; font-size: 14px; }
+.cf__btn--pay { background: #1a5fb4; color: #fff; border: 0; }
+.cf__btn--pay:active { background: #154a8c; }
+.cf__note--ok { background: #e3f4e8; }
+.cf__addr { margin-top: 18px; padding-top: 14px; border-top: 1px solid #eee; }
+.cf__address { font-style: normal; line-height: 1.5; color: #333; margin: 6px 0 8px; }
+.cf__link { background: none; border: 0; padding: 0; color: #1f8f4e; font-weight: 600; font-size: 15px; cursor: pointer; }
+.cf__form { display: grid; gap: 10px; margin-top: 8px; }
+.cf__form label { display: grid; gap: 4px; font-size: 13px; color: #555; }
+.cf__form input { font: inherit; font-size: 16px; padding: 10px 12px; border: 1px solid #ccc; border-radius: 10px; }
+.cf__row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: end; }

@@ -5,10 +5,13 @@ import { formatPhone } from "../lib/phone.js";
 import { LOCALES } from "../i18n/core.js";
 import { useT } from "../i18n/react.jsx";
 import { Page, Card, Banner } from "../components/ui";
+import { Link } from "react-router";
+import { hasFeature, planOf } from "../lib/plans.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  return { settings: await getSettings(session.shop) };
+  const settings = await getSettings(session.shop);
+  return { settings, pro: hasFeature(planOf(settings), "codRisk") };
 };
 
 export const action = async ({ request }) => {
@@ -47,7 +50,7 @@ function Account() {
 
 export default function Settings() {
   const tr = useT();
-  const { settings } = useLoaderData();
+  const { settings, pro } = useLoaderData();
   const result = useActionData();
   const nav = useNavigation();
   const errors = result?.errors || {};
@@ -94,6 +97,32 @@ export default function Settings() {
 
         <Card title={tr("Abandoned checkouts")}>
           <Field label={tr("Show checkouts after (minutes)")} name="abandonDelayMin" type="number" min={10} max={1440} defaultValue={s.abandonDelayMin} help={tr("Gives shoppers time to finish on their own first.")} />
+        </Card>
+
+        <Card title={tr("COD money-savers (Pro)")}>
+          {!pro && (
+            <p className="wa-banner wa-banner--info">
+              {tr("These run on the Pro plan.")} <Link to="/app/plan">{tr("See Pro")}</Link>
+            </p>
+          )}
+          <fieldset disabled={!pro} className="wa-fieldset">
+            {pro && <input type="hidden" name="proSettings" value="1" />}
+            <h3 className="wa-h3">{tr("COD risk score")}</h3>
+            <label className="wa-check"><input type="checkbox" name="riskTagHigh" defaultChecked={s.riskTagHigh} /> {tr("Tag high-risk COD orders in Shopify")}</label>
+            <Field label={tr("Tag for high-risk orders")} name="riskTag" defaultValue={s.riskTag} />
+
+            <h3 className="wa-h3">{tr("COD → prepaid")}</h3>
+            <label className="wa-check"><input type="checkbox" name="prepaidEnabled" defaultChecked={s.prepaidEnabled} /> {tr("Offer “pay online now” on the confirm page")}</label>
+            <div className="wa-grid wa-grid--2">
+              <Field label={tr("Discount for paying online (%)")} name="prepaidPercent" type="number" min={0} max={30} step="0.5" defaultValue={s.prepaidPercent} help={tr("0 = no discount. Taken off the items, not shipping.")} />
+              <Field label={tr("Maximum discount (0 = no limit)")} name="prepaidMaxAmount" type="number" min={0} step="1" defaultValue={s.prepaidMaxAmount} help={tr("In your store currency.")} />
+            </div>
+            <Field label={tr("Tag for orders paid online")} name="prepaidTag" defaultValue={s.prepaidTag} />
+            <p className="wa-muted wa-small">{tr("The customer pays on Shopify's own payment page for the same order. Shopify needs an online payment method set up in Settings → Payments.")}</p>
+
+            <h3 className="wa-h3">{tr("Address check")}</h3>
+            <label className="wa-check"><input type="checkbox" name="addressCheck" defaultChecked={s.addressCheck} /> {tr("Let customers fix their address or add a landmark on the confirm page")}</label>
+          </fieldset>
         </Card>
 
         <div className="wa-sticky-actions">
