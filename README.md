@@ -1,5 +1,7 @@
 # PingZest: free plan
 
+[![CI](https://github.com/videsh-dp/PingZest/actions/workflows/ci.yml/badge.svg)](https://github.com/videsh-dp/PingZest/actions/workflows/ci.yml)
+
 WhatsApp widgets, COD confirmation, abandoned checkout reminders and order updates for Shopify.
 **Manual send:** the app prepares every message and opens WhatsApp with it typed in; the merchant
 presses send. There's no Meta API, no Meta business verification and no per-message fees.
@@ -90,6 +92,20 @@ Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.j
 `app/i18n/confirm.js`, default templates in `app/lib/templates.js`, and storefront texts in `wa-widget.js` and
 `extensions/pingzest-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
 string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
+
+## Cloud tests (GitHub Actions)
+
+Every push runs `.github/workflows/ci.yml` on GitHub (free for public repos):
+
+1. Install, then `prisma validate` / `generate` / `db push` against a real **MongoDB replica set**
+2. Unit tests, translation coverage, **production build** (catches server-only code leaking into the browser bundle)
+3. **Integration tests** (`test/integration/server.test.mjs`): starts the production server and calls it the way Shopify
+   does: HMAC-signed webhooks (orders, paid, plan changes, privacy), the confirm page (view + Confirm), public pages.
+   A fake PostHog server checks that every request is logged and that phone numbers and addresses never leave.
+4. **Browser tests** of the storefront widgets (Playwright + Chromium); screenshots are kept as a build artifact.
+
+Not covered (needs a real store): Shopify Admin API calls — billing approval, order tags, the prepaid order edit,
+the address update and the theme metafield.
 
 ## Logging, errors and feature flags (PostHog)
 
