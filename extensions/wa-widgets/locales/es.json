@@ -1,0 +1,23 @@
+{
+  "blocks": {
+    "product_button": {
+      "label": "Preguntar por este producto",
+      "message": "¡Hola! Me gustaría saber más sobre {product}: {url}"
+    },
+    "share_button": {
+      "label": "Compartir por WhatsApp",
+      "message": "Mira lo que encontré: {product} {url}"
+    },
+    "cart_order": {
+      "label": "Pedir por WhatsApp",
+      "intro": "¡Hola! Me gustaría pedir:",
+      "outro": "Por favor, confirma disponibilidad y entrega.",
+      "empty_text": "¡Hola! Necesito ayuda para hacer un pedido.",
+      "note": "¿Prefieres chatear? Envíanos tu carrito por WhatsApp."
+    },
+    "optin": {
+      "label": "Envíame novedades del pedido por WhatsApp",
+      "help": "Solo te escribiremos sobre este pedido. Responde STOP cuando quieras."
+    }
+  }
+}

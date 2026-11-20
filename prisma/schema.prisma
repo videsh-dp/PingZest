@@ -33,7 +33,8 @@ model ShopSettings {
   storeName        String   @default("")
   whatsappNumber   String   @default("") // store's own number, digits only
   countryCode      String   @default("91")
-  defaultLang      String   @default("en") // en | hi
+  defaultLang      String   @default("en") // default message language (any app locale code)
+  appLocale        String   @default("auto") // admin language: "auto" = follow Shopify admin
   confirmedTag     String   @default("wa-cod-confirmed")
   cancelledTag     String   @default("wa-cod-cancelled")
   abandonDelayMin  Int      @default(30)

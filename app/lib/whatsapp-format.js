@@ -105,13 +105,15 @@ export function insertAt(text, start, end, value) {
   return { text: text.slice(0, start) + value + text.slice(end), start: start + value.length, end: start + value.length };
 }
 
+import { N_ } from "../i18n/core.js";
+
 export const FORMAT_HELP = [
-  ["*bold*", "Bold"],
-  ["_italic_", "Italic"],
-  ["~strike~", "Strikethrough"],
-  ["```mono```", "Monospace"],
-  ["`code`", "Inline code"],
-  ["> quote", "Quote"],
-  ["- item", "Bulleted list"],
-  ["1. item", "Numbered list"],
+  ["*bold*", N_("Bold")],
+  ["_italic_", N_("Italic")],
+  ["~strike~", N_("Strikethrough")],
+  ["```mono```", N_("Monospace")],
+  ["`code`", N_("Inline code")],
+  ["> quote", N_("Quote")],
+  ["- item", N_("Bulleted list")],
+  ["1. item", N_("Numbered list")],
 ];

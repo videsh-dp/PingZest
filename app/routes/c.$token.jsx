@@ -3,40 +3,29 @@
  * Opened by the customer from the WhatsApp message. No login. The token is
  * random and expires; tapping Confirm/Cancel tags the order in Shopify.
  */
-import { Form, useLoaderData, useNavigation, data } from "react-router";
+import { Form, useLoaderData, useNavigation, useRouteError, data } from "react-router";
 import { unauthenticated } from "../shopify.server";
 import { findByToken, setCodStatus } from "../models/orders.server";
 import { getSettings } from "../models/settings.server";
 import { tagOrder, removeOrderTags } from "../models/shopify-admin.server";
 import { isValidTokenFormat } from "../lib/tokens.js";
-import { formatMoney } from "../lib/orders.js";
+import { resolveLocale, interpolate, dirOf, formatCurrency } from "../i18n/core.js";
+import { CONFIRM_TEXTS } from "../i18n/confirm.js";
 import { waLink } from "../lib/whatsapp.js";
 import { appUrl } from "../models/messages.server";
 import styles from "../styles/confirm.css?url";
 
 export const links = () => [{ rel: "stylesheet", href: styles }];
 
-const T = {
-  en: {
-    title: (o) => `Confirm your order ${o}`,
-    lead: (s) => `Your Cash on Delivery order from ${s}`,
-    confirm: "Confirm order", cancel: "Cancel order", total: "Total to pay on delivery",
-    confirmed: "Thank you! Your order is confirmed.", confirmedSub: "We'll ship it soon and keep you posted on WhatsApp.",
-    cancelled: "Your order has been cancelled.", cancelledSub: "Changed your mind? Message us and we'll help.",
-    expired: "This link has expired.", expiredSub: "Please message the store on WhatsApp to confirm your order.",
-    notFound: "We couldn't find this order.", locked: "This order has already shipped, so it can't be changed here.",
-    back: "Message the store on WhatsApp", change: "Changed your mind?", confirmCancel: "Cancel this order?",
-  },
-  hi: {
-    title: (o) => `अपना ऑर्डर ${o} कन्फर्म करें`,
-    lead: (s) => `${s} से आपका कैश ऑन डिलीवरी ऑर्डर`,
-    confirm: "ऑर्डर कन्फर्म करें", cancel: "ऑर्डर कैंसल करें", total: "डिलीवरी पर देय राशि",
-    confirmed: "धन्यवाद! आपका ऑर्डर कन्फर्म हो गया है।", confirmedSub: "हम जल्द ही इसे भेजेंगे और WhatsApp पर अपडेट देंगे।",
-    cancelled: "आपका ऑर्डर कैंसल कर दिया गया है।", cancelledSub: "मन बदल गया? हमें मैसेज करें, हम मदद करेंगे।",
-    expired: "यह लिंक एक्सपायर हो गया है।", expiredSub: "कृपया ऑर्डर कन्फर्म करने के लिए स्टोर को WhatsApp पर मैसेज करें।",
-    notFound: "यह ऑर्डर नहीं मिला।", locked: "यह ऑर्डर भेजा जा चुका है, इसलिए यहाँ बदला नहीं जा सकता।",
-    back: "स्टोर को WhatsApp पर मैसेज करें", change: "मन बदल गया?", confirmCancel: "क्या यह ऑर्डर कैंसल करें?",
-  },
+/** Customer's language: the message's language (?l=), then their browser, then the shop default. */
+function confirmLocale(request, settings) {
+  const url = new URL(request.url);
+  return resolveLocale(url.searchParams.get("l") || url.searchParams.get("lang"), request.headers.get("accept-language"), settings?.defaultLang);
+}
+
+const textsFor = (lang) => {
+  const t = CONFIRM_TEXTS[lang] || CONFIRM_TEXTS.en;
+  return (key, vars) => interpolate(t[key] ?? CONFIRM_TEXTS.en[key], vars);
 };
 
 async function load(token) {
@@ -53,22 +42,20 @@ function view(order, settings, lang) {
     storeName: settings.storeName || order.shop.replace(".myshopify.com", ""),
     orderName: order.orderName,
     customerName: order.customerName,
-    amount: formatMoney(order.totalPrice, order.currency),
+    amount: formatCurrency(order.totalPrice, order.currency, lang),
     items: order.itemsSummary,
     status: order.codStatus,
     expired: Boolean(order.expired),
     locked: Boolean(order.shippedAt),
-    storeChat: settings.whatsappNumber ? waLink(settings.whatsappNumber, `Hi, about my order ${order.orderName}`) : null,
+    storeChat: settings.whatsappNumber ? waLink(settings.whatsappNumber, textsFor(lang)("chat", { order: order.orderName })) : null,
     ogImage: `${appUrl()}/og-confirm.png`,
   };
 }
 
 export const loader = async ({ params, request }) => {
   const found = await load(params.token);
-  const qLang = new URL(request.url).searchParams.get("lang");
-  if (!found) throw data({ lang: qLang === "hi" ? "hi" : "en" }, { status: 404 });
-  const lang = ["en", "hi"].includes(qLang) ? qLang : found.settings.defaultLang || "en";
-  return view(found.order, found.settings, lang);
+  if (!found) throw data({ lang: confirmLocale(request) }, { status: 404 });
+  return view(found.order, found.settings, confirmLocale(request, found.settings));
 };
 
 export const action = async ({ params, request }) => {
@@ -95,12 +82,12 @@ export const action = async ({ params, request }) => {
 
 export const meta = ({ data: d }) => {
   if (!d?.orderName) return [{ title: "Order" }, { name: "robots", content: "noindex" }];
-  const t = T[d.lang] || T.en;
+  const t = textsFor(d.lang);
   return [
-    { title: t.title(d.orderName) },
+    { title: t("title", { order: d.orderName }) },
     { name: "robots", content: "noindex, nofollow" },
-    { property: "og:title", content: t.title(d.orderName) },
-    { property: "og:description", content: `${t.lead(d.storeName)} · ${d.amount}` },
+    { property: "og:title", content: t("title", { order: d.orderName }) },
+    { property: "og:description", content: `${t("lead", { store: d.storeName })} · ${d.amount}` },
     { property: "og:image", content: d.ogImage },
     { property: "og:image:width", content: "1200" },
     { property: "og:image:height", content: "630" },
@@ -111,14 +98,15 @@ export const meta = ({ data: d }) => {
 export default function ConfirmPage() {
   const d = useLoaderData();
   const nav = useNavigation();
-  const t = T[d.lang] || T.en;
+  const tx = textsFor(d.lang);
+  const t = new Proxy({}, { get: (_, k) => tx(k) });
   const busy = nav.state !== "idle";
   const pendingChoice = nav.formData?.get("choice");
   const status = pendingChoice || d.status;
   const decided = status === "confirmed" || status === "cancelled";
 
   return (
-    <main className="cf" lang={d.lang}>
+    <main className="cf" lang={d.lang} dir={dirOf(d.lang)}>
       <div className="cf__card">
         <p className="cf__store">{d.storeName}</p>
 
@@ -132,8 +120,8 @@ export default function ConfirmPage() {
           />
         ) : (
           <>
-            <h1 className="cf__title">{t.title(d.orderName)}</h1>
-            <p className="cf__lead">{t.lead(d.storeName)}</p>
+            <h1 className="cf__title">{tx("title", { order: d.orderName })}</h1>
+            <p className="cf__lead">{tx("lead", { store: d.storeName })}</p>
           </>
         )}
 
@@ -176,10 +164,12 @@ function Result({ icon, title, sub }) {
 }
 
 export function ErrorBoundary() {
+  const lang = useRouteError()?.data?.lang || "en";
+  const t = textsFor(lang);
   return (
-    <main className="cf">
+    <main className="cf" lang={lang} dir={dirOf(lang)}>
       <div className="cf__card">
-        <Result icon="🔍" title={T.en.notFound} sub={T.en.expiredSub} />
+        <Result icon="🔍" title={t("notFound")} sub={t("expiredSub")} />
       </div>
     </main>
   );

@@ -5,13 +5,16 @@
   consent must be an active choice.
 {%- endcomment -%}
 {%- assign s = block.settings -%}
+{%- comment -%} Untouched default texts follow the shopper's language (locales/*.json). {%- endcomment -%}
+{%- assign t_label = s.label -%}{%- if t_label == "Send me order updates on WhatsApp" -%}{%- assign t_label = 'blocks.optin.label' | t -%}{%- endif -%}
+{%- assign t_help = s.help -%}{%- if t_help == "We'll only message you about this order. Reply STOP anytime." -%}{%- assign t_help = 'blocks.optin.help' | t -%}{%- endif -%}
 {%- assign current = cart.attributes['WhatsApp updates'] -%}
 <div class="wa-block wa-optin" {{ block.shopify_attributes }}>
   <label class="wa-optin__label">
     <input type="checkbox" class="wa-optin__input" data-wa-widget="optin" {% if current == 'yes' %}checked{% endif %}>
-    <span>{{ s.label | escape }}</span>
+    <span>{{ t_label | escape }}</span>
   </label>
-  {%- if s.help != blank -%}<p class="wa-note">{{ s.help | escape }}</p>{%- endif -%}
+  {%- if t_help != blank -%}<p class="wa-note">{{ t_help | escape }}</p>{%- endif -%}
 </div>
 
 {% schema %}

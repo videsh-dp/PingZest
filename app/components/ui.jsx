@@ -6,6 +6,8 @@ import { useState } from "react";
 import { Link, useFetcher, useNavigate, useSearchParams } from "react-router";
 import { composeMessage } from "../lib/compose.js";
 import { formatWhatsApp } from "../lib/whatsapp-format.js";
+import { useT } from "../i18n/react.jsx";
+import { LOCALES, N_ } from "../i18n/core.js";
 
 export function Page({ title, subtitle, actions, children }) {
   return (
@@ -48,18 +50,20 @@ const TONES = {
   dismissed: "neutral", recovered: "success",
 };
 const LABELS = {
-  pending: "To send", sent: "Waiting", confirmed: "Confirmed", cancelled: "Cancelled", no_reply: "No reply",
-  dismissed: "Dismissed", recovered: "Recovered",
+  pending: N_("To send"), sent: N_("Waiting"), confirmed: N_("Confirmed"), cancelled: N_("Cancelled"), no_reply: N_("No reply"),
+  dismissed: N_("Dismissed"), recovered: N_("Recovered"),
 };
 export function StatusBadge({ status }) {
-  return <span className={`wa-badge wa-badge--${TONES[status] || "neutral"}`}>{LABELS[status] || status}</span>;
+  const tr = useT();
+  return <span className={`wa-badge wa-badge--${TONES[status] || "neutral"}`}>{LABELS[status] ? tr(LABELS[status]) : status}</span>;
 }
 
 export function Tabs({ tabs, param = "filter" }) {
+  const tr = useT();
   const [params] = useSearchParams();
   const current = params.get(param) || tabs[0].id;
   return (
-    <nav className="wa-tabs" aria-label="Filter">
+    <nav className="wa-tabs" aria-label={tr("Filter")}>
       {tabs.map((t) => {
         const next = new URLSearchParams(params);
         next.set(param, t.id);
@@ -74,18 +78,25 @@ export function Tabs({ tabs, param = "filter" }) {
   );
 }
 
-export function LangSwitch({ lang }) {
+/** Message language for a queue (?lang=). Lists the languages that have templates. */
+export function LangSwitch({ lang, langs }) {
+  const tr = useT();
   const [params] = useSearchParams();
-  const make = (l) => {
+  const navigate = useNavigate();
+  const codes = langs?.length ? langs : Object.keys(LOCALES);
+  const onChange = (e) => {
     const p = new URLSearchParams(params);
-    p.set("lang", l);
-    return `?${p.toString()}`;
+    p.set("lang", e.target.value);
+    p.delete("tpl");
+    navigate(`?${p.toString()}`, { preventScrollReset: true, replace: true });
   };
   return (
-    <div className="wa-seg" role="group" aria-label="Message language">
-      <Link to={make("en")} className={lang === "en" ? "is-active" : ""} preventScrollReset>English</Link>
-      <Link to={make("hi")} className={lang === "hi" ? "is-active" : ""} preventScrollReset>हिन्दी</Link>
-    </div>
+    <label className="wa-picker">
+      <span className="wa-muted">{tr("Message language")}</span>
+      <select className="wa-input wa-input--inline" value={lang} onChange={onChange}>
+        {codes.map((c) => <option key={c} value={c}>{LOCALES[c]?.native || c}</option>)}
+      </select>
+    </label>
   );
 }
 
@@ -106,9 +117,10 @@ export function Banner({ tone = "info", children }) {
  * "Send on WhatsApp": opens the chat with the message typed in and records that it was sent.
  * The merchant still presses send inside WhatsApp.
  */
-export function SendButton({ link, intent, id, extra = {}, label = "Send on WhatsApp", disabled }) {
+export function SendButton({ link, intent, id, extra = {}, label, disabled }) {
+  const tr = useT();
   const fetcher = useFetcher();
-  if (!link) return <span className="wa-muted">No WhatsApp number</span>;
+  if (!link) return <span className="wa-muted">{tr("No WhatsApp number")}</span>;
   return (
     <a
       href={link}
@@ -117,7 +129,7 @@ export function SendButton({ link, intent, id, extra = {}, label = "Send on What
       className={`wa-button wa-button--primary ${disabled ? "is-disabled" : ""}`}
       onClick={() => fetcher.submit({ intent, id: String(id), ...extra }, { method: "post" })}
     >
-      {fetcher.state !== "idle" ? "Opening…" : label}
+      {fetcher.state !== "idle" ? tr("Opening…") : label || tr("Send on WhatsApp")}
     </a>
   );
 }
@@ -140,24 +152,16 @@ export function ActionButton({ intent, id, extra = {}, children, tone = "seconda
 }
 
 export function MessagePreview({ message, missing = [], warning }) {
+  const tr = useT();
   const [open, setOpen] = useState(false);
   return (
     <div className="wa-preview">
-      <button type="button" className="wa-link" onClick={() => setOpen(!open)}>{open ? "Hide message" : "Preview message"}</button>
+      <button type="button" className="wa-link" onClick={() => setOpen(!open)}>{open ? tr("Hide message") : tr("Preview message")}</button>
       {open && <WaBubble text={message} />}
-      {missing.length > 0 && <p className="wa-warn">Missing: {missing.map((m) => `{${m}}`).join(", ")}</p>}
+      {missing.length > 0 && <p className="wa-warn">{tr("Missing: {list}", { list: missing.map((m) => `{${m}}`).join(", ") })}</p>}
       {warning && <p className="wa-warn">{warning}</p>}
     </div>
   );
-}
-
-export function timeAgo(date) {
-  if (!date) return "";
-  const s = Math.max(0, (Date.now() - new Date(date).getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return `${Math.floor(s / 86400)} d ago`;
 }
 
 /** A message rendered the way WhatsApp shows it (bold, italic, lists…). */
@@ -184,6 +188,7 @@ export function useQueueTemplate(templates, lang) {
 }
 
 export function TemplatePicker({ templates, chosen }) {
+  const tr = useT();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   if (!templates.length) return null;
@@ -194,11 +199,11 @@ export function TemplatePicker({ templates, chosen }) {
   };
   return (
     <label className="wa-picker">
-      <span className="wa-muted">Template</span>
+      <span className="wa-muted">{tr("Template")}</span>
       <select className="wa-input wa-input--inline" value={chosen?.id ?? ""} onChange={onChange}>
-        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? " (default)" : ""}</option>)}
+        {templates.map((t) => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ` (${tr("default")})` : ""}</option>)}
       </select>
-      <Link to="/app/templates" className="wa-muted">Edit</Link>
+      <Link to="/app/templates" className="wa-muted">{tr("Edit")}</Link>
     </label>
   );
 }

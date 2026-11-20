@@ -12,7 +12,7 @@ include_config_on_deploy = true
 # read_orders also covers checkouts (abandoned checkouts) and fulfillments webhooks.
 # write_orders lets the confirm page tag orders "wa-cod-confirmed" / "wa-cod-cancelled".
 # read/write_discounts let merchants create discount codes for the discount banner.
-scopes = "read_orders,write_orders,read_discounts,write_discounts"
+scopes = "read_orders,write_orders,read_discounts,write_discounts,read_locales"
 
 [auth]
 redirect_urls = ["https://example.com/auth/callback"]

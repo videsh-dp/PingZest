@@ -1,5 +1,8 @@
 {%- comment -%} App block: "Share on WhatsApp" for products or any page. {%- endcomment -%}
 {%- assign s = block.settings -%}
+{%- comment -%} Untouched default texts follow the shopper's language (locales/*.json). {%- endcomment -%}
+{%- assign t_label = s.label -%}{%- if t_label == "Share on WhatsApp" -%}{%- assign t_label = 'blocks.share_button.label' | t -%}{%- endif -%}
+{%- assign t_message = s.message -%}{%- if t_message == "Look what I found: {product} {url}" -%}{%- assign t_message = 'blocks.share_button.message' | t -%}{%- endif -%}
 {%- liquid
   assign title = page_title
   if product
@@ -10,10 +13,10 @@
 <div class="wa-block" data-wa-block="share" {{ block.shopify_attributes }}>
   <a href="#" class="wa-btn"
     data-wa-widget="share"
-    data-message="{{ s.message | escape }}"
+    data-message="{{ t_message | escape }}"
     data-product="{{ title | escape }}"
     rel="noopener" target="_blank">
-    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+    {% render 'wa-icon' %}<span>{{ t_label | escape }}</span>
   </a>
 </div>
 

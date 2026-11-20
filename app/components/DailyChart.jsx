@@ -3,6 +3,7 @@
  * Plain SVG: no chart library. Bars are thin with 4px rounded tops and a 2px gap.
  */
 import { useState } from "react";
+import { useT } from "../i18n/react.jsx";
 
 const H = 180, PAD_L = 36, PAD_B = 22, PAD_T = 10;
 
@@ -12,10 +13,11 @@ function niceMax(v) {
   const step = [1, 2, 2.5, 5, 10].find((s) => (s * pow * 4) >= v) * pow;
   return step * 4;
 }
-const shortDay = (d) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-IN", { day: "numeric", month: "short", timeZone: "UTC" });
 
 /** data: [{ day: "2026-11-01", value: 12, detail: "340 views" }] */
 export function DailyChart({ data, label, width = 960 }) {
+  const tr = useT();
+  const shortDay = (d) => tr.date(d);
   const [hover, setHover] = useState(null);
   const max = niceMax(Math.max(0, ...data.map((d) => d.value)));
   const plotW = width - PAD_L - 8;
@@ -30,7 +32,7 @@ export function DailyChart({ data, label, width = 960 }) {
   return (
     <div className="wa-chart">
       <div className="wa-chart__frame" onMouseLeave={() => setHover(null)}>
-        <svg viewBox={`0 0 ${width} ${H}`} width="100%" role="img" aria-label={`${label} per day`}>
+        <svg viewBox={`0 0 ${width} ${H}`} width="100%" role="img" aria-label={tr("{label} per day", { label })}>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={PAD_L} x2={width - 8} y1={y(t)} y2={y(t)} className="wa-chart__grid" />
@@ -65,15 +67,15 @@ export function DailyChart({ data, label, width = 960 }) {
         {h && (
           <div className="wa-chart__tip" style={{ left: `${((PAD_L + hover * slot + slot / 2) / width) * 100}%` }}>
             <strong>{shortDay(h.day)}</strong>
-            <span>{h.value} {label.toLowerCase()}</span>
+            <span>{tr.n(h.value)} · {label}</span>
             {h.detail && <span className="wa-muted">{h.detail}</span>}
           </div>
         )}
       </div>
       <details className="wa-chart__table">
-        <summary>Show as table</summary>
+        <summary>{tr("Show as table")}</summary>
         <table className="wa-table">
-          <thead><tr><th>Day</th><th className="wa-right">{label}</th><th>Details</th></tr></thead>
+          <thead><tr><th>{tr("Day")}</th><th className="wa-right">{label}</th><th>{tr("Details")}</th></tr></thead>
           <tbody>{data.filter((d) => d.value || d.detail).map((d) => (
             <tr key={d.day}><td>{shortDay(d.day)}</td><td className="wa-right">{d.value}</td><td className="wa-muted">{d.detail}</td></tr>
           ))}</tbody>

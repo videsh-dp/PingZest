@@ -1,6 +1,7 @@
 import { redirect, useLoaderData } from "react-router";
 import { Landing } from "../components/Landing";
 import styles from "../styles/landing.css?url";
+import { browserLocale, dictionaryFor } from "../i18n/server.js";
 
 export const links = () => [{ rel: "stylesheet", href: styles }];
 export const meta = () => [
@@ -13,10 +14,11 @@ export const meta = () => [
 export const loader = async ({ request }) => {
   const url = new URL(request.url);
   if (url.searchParams.get("shop")) throw redirect(`/app?${url.searchParams.toString()}`);
-  return { signedOut: url.searchParams.get("signed_out") === "1" };
+  const locale = browserLocale(request);
+  return { signedOut: url.searchParams.get("signed_out") === "1", locale, dict: dictionaryFor(locale) };
 };
 
 export default function Index() {
-  const { signedOut } = useLoaderData();
-  return <Landing signedOut={signedOut} />;
+  const { signedOut, locale, dict } = useLoaderData();
+  return <Landing signedOut={signedOut} locale={locale} dict={dict} />;
 }

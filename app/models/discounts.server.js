@@ -5,6 +5,7 @@
 import prisma from "../db.server";
 import { createCodeDiscount, setDiscountActive, deleteCodeDiscount } from "./shopify-admin.server";
 import { parseDiscountForm } from "../lib/discounts.js";
+import { N_ } from "../i18n/core.js";
 
 export { parseDiscountForm };
 
@@ -16,7 +17,7 @@ export async function createDiscount(shop, admin, form) {
   const parsed = parseDiscountForm(form);
   if (parsed.errors) return parsed;
   const exists = await prisma.discount.findUnique({ where: { shop_code: { shop, code: parsed.data.code } } });
-  if (exists) return { errors: { code: "You already created this code." } };
+  if (exists) return { errors: { code: N_("You already created this code.") } };
   const result = await createCodeDiscount(admin, parsed.data);
   if (result.error) return { errors: { form: `Shopify: ${result.error}` } };
   const discount = await prisma.discount.create({ data: { shop, shopifyGid: result.gid, ...parsed.data } });

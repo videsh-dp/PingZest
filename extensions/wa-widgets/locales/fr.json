@@ -1,0 +1,23 @@
+{
+  "blocks": {
+    "product_button": {
+      "label": "Poser une question sur ce produit",
+      "message": "Bonjour ! J'aimerais en savoir plus sur {product} : {url}"
+    },
+    "share_button": {
+      "label": "Partager sur WhatsApp",
+      "message": "Regarde ce que j'ai trouvé : {product} {url}"
+    },
+    "cart_order": {
+      "label": "Commander sur WhatsApp",
+      "intro": "Bonjour ! Je souhaite commander :",
+      "outro": "Merci de confirmer la disponibilité et la livraison.",
+      "empty_text": "Bonjour ! J'aimerais de l'aide pour passer commande.",
+      "note": "Vous préférez discuter ? Envoyez-nous votre panier sur WhatsApp."
+    },
+    "optin": {
+      "label": "Recevoir le suivi de commande sur WhatsApp",
+      "help": "Nous vous écrirons uniquement au sujet de cette commande. Répondez STOP à tout moment."
+    }
+  }
+}

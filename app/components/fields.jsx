@@ -1,5 +1,6 @@
 /** Form controls for the Widgets editor. All controlled: value + onChange(newValue). */
-import { PAGE_TYPES, describeRules } from "../lib/widget-config.js";
+import { PAGE_TYPES } from "../lib/widget-config.js";
+import { useT } from "../i18n/react.jsx";
 
 const SWATCHES = ["#1f8f4e", "#128c7e", "#0f766e", "#2563eb", "#6b21a8", "#db2777", "#dc2626", "#ea580c", "#1c1c1c", "#ffffff"];
 
@@ -89,49 +90,59 @@ export function ColorField({ label, value, onChange }) {
 
 /** Which store pages a widget shows on. */
 export function PageRules({ value, onChange }) {
+  const tr = useT();
   const v = value || { mode: "all", pageTypes: [], paths: [] };
   const set = (patch) => onChange({ ...v, ...patch });
   const togglePage = (t) => set({ pageTypes: v.pageTypes.includes(t) ? v.pageTypes.filter((x) => x !== t) : [...v.pageTypes, t] });
   return (
     <div className="wa-rules">
-      <Choice value={v.mode} onChange={(mode) => set({ mode })} options={[["all", "All pages"], ["include", "Only on…"], ["exclude", "All except…"]]} />
+      <Choice value={v.mode} onChange={(mode) => set({ mode })} options={[["all", tr("All pages")], ["include", tr("Only on…")], ["exclude", tr("All except…")]]} />
       {v.mode !== "all" && (
         <>
           <div className="wa-checks">
             {Object.entries(PAGE_TYPES).map(([t, label]) => (
               <label key={t} className="wa-check">
-                <input type="checkbox" checked={v.pageTypes.includes(t)} onChange={() => togglePage(t)} /> {label}
+                <input type="checkbox" checked={v.pageTypes.includes(t)} onChange={() => togglePage(t)} /> {tr(label)}
               </label>
             ))}
           </div>
           <label className="wa-field">
-            <span className="wa-field__label">Specific URLs (one per line)</span>
+            <span className="wa-field__label">{tr("Specific URLs (one per line)")}</span>
             <textarea className="wa-textarea wa-textarea--sm" rows={3} placeholder={"/pages/contact\n/products/*\n/collections/sale*"}
               value={v.paths.join("\n")} onChange={(e) => set({ paths: e.target.value.split("\n") })} />
-            <span className="wa-muted">Use * as a wildcard. Paths start with /.</span>
+            <span className="wa-muted">{tr("Use * as a wildcard. Paths start with /.")}</span>
           </label>
         </>
       )}
-      <p className="wa-rules__summary">{describeRules({ ...v, paths: v.paths.filter((p) => p.trim().startsWith("/")) })}</p>
+      <p className="wa-rules__summary">{ruleSummary(tr, v)}</p>
     </div>
   );
 }
 
 /** Up to 5 chat agents. */
 export function Agents({ value, onChange }) {
+  const tr = useT();
   const list = value?.length ? value : [{ name: "", phone: "" }];
   const update = (i, patch) => onChange(list.map((a, j) => (j === i ? { ...a, ...patch } : a)));
   return (
     <div className="wa-agents">
       {list.map((a, i) => (
         <div key={i} className="wa-agent-row">
-          <input className="wa-input" placeholder="Name, e.g. Support" value={a.name} maxLength={40} onChange={(e) => update(i, { name: e.target.value })} aria-label={`Agent ${i + 1} name`} />
-          <input className="wa-input" placeholder="+91 98765 43210" inputMode="tel" value={a.phone} maxLength={24} onChange={(e) => update(i, { phone: e.target.value })} aria-label={`Agent ${i + 1} WhatsApp number`} />
-          {list.length > 1 && <button type="button" className="wa-button wa-button--plain" aria-label="Remove agent" onClick={() => onChange(list.filter((_, j) => j !== i))}>✕</button>}
+          <input className="wa-input" placeholder={tr("Name, e.g. Support")} value={a.name} maxLength={40} onChange={(e) => update(i, { name: e.target.value })} aria-label={tr("Agent {n} name", { n: i + 1 })} />
+          <input className="wa-input" placeholder="+91 98765 43210" inputMode="tel" value={a.phone} maxLength={24} onChange={(e) => update(i, { phone: e.target.value })} aria-label={tr("Agent {n} WhatsApp number", { n: i + 1 })} />
+          {list.length > 1 && <button type="button" className="wa-button wa-button--plain" aria-label={tr("Remove agent")} onClick={() => onChange(list.filter((_, j) => j !== i))}>✕</button>}
         </div>
       ))}
-      {list.length < 5 && <button type="button" className="wa-link" onClick={() => onChange([...list, { name: "", phone: "" }])}>+ Add agent</button>}
-      <span className="wa-muted wa-d-block">Chats rotate between agents when the popup is off.</span>
+      {list.length < 5 && <button type="button" className="wa-link" onClick={() => onChange([...list, { name: "", phone: "" }])}>{tr("+ Add agent")}</button>}
+      <span className="wa-muted wa-d-block">{tr("Chats rotate between agents when the popup is off.")}</span>
     </div>
   );
+}
+
+/** "Only on: Product pages, /pages/faq" in the merchant's language. */
+function ruleSummary(tr, v) {
+  if (!v || v.mode === "all") return tr("All pages");
+  const parts = [...(v.pageTypes || []).map((t) => tr(PAGE_TYPES[t])), ...(v.paths || []).filter((p) => p.trim().startsWith("/"))];
+  const list = parts.length ? parts.join(", ") : tr("nothing selected");
+  return v.mode === "include" ? tr("Only on: {list}", { list }) : tr("Everywhere except: {list}", { list });
 }

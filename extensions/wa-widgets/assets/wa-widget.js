@@ -138,7 +138,75 @@
   /* ---------- context ---------- */
 
   var config = null;
-  var page = { pageType: "other", path: "/", product: null, shop: "", currency: "INR", root: "/" };
+  var page = { pageType: "other", path: "/", product: null, shop: "", currency: "INR", root: "/", locale: "en" };
+
+  /* ---------- language: built-in labels + the merchant's per-language texts ---------- */
+
+  var UI = {
+    en: { online: "Online", offline: "Offline", close: "Close", dismiss: "Dismiss", copied: "Copied!", applied: "✓ Applied", discount: "Discount", chat: "Chat on WhatsApp", support: "Support", apply: "Apply", copy: "Copy code" },
+    hi: { online: "ऑनलाइन", offline: "ऑफ़लाइन", close: "बंद करें", dismiss: "हटाएँ", copied: "कॉपी हो गया!", applied: "✓ लग गया", discount: "छूट", chat: "WhatsApp पर चैट करें", support: "सपोर्ट", apply: "लगाएँ", copy: "कोड कॉपी करें" },
+    es: { online: "En línea", offline: "Desconectado", close: "Cerrar", dismiss: "Descartar", copied: "¡Copiado!", applied: "✓ Aplicado", discount: "Descuento", chat: "Chatea por WhatsApp", support: "Soporte", apply: "Aplicar", copy: "Copiar código" },
+    pt: { online: "Online", offline: "Offline", close: "Fechar", dismiss: "Dispensar", copied: "Copiado!", applied: "✓ Aplicado", discount: "Desconto", chat: "Converse no WhatsApp", support: "Suporte", apply: "Aplicar", copy: "Copiar código" },
+    fr: { online: "En ligne", offline: "Hors ligne", close: "Fermer", dismiss: "Ignorer", copied: "Copié !", applied: "✓ Appliqué", discount: "Réduction", chat: "Discuter sur WhatsApp", support: "Support", apply: "Appliquer", copy: "Copier le code" },
+    de: { online: "Online", offline: "Offline", close: "Schließen", dismiss: "Ausblenden", copied: "Kopiert!", applied: "✓ Eingelöst", discount: "Rabatt", chat: "Per WhatsApp chatten", support: "Support", apply: "Einlösen", copy: "Code kopieren" },
+    ar: { online: "متصل", offline: "غير متصل", close: "إغلاق", dismiss: "إخفاء", copied: "تم النسخ!", applied: "✓ تم التطبيق", discount: "خصم", chat: "دردش عبر واتساب", support: "الدعم", apply: "تطبيق", copy: "نسخ الرمز" },
+  };
+  function L(key) {
+    var base = String(page.locale || "en").split("-")[0].toLowerCase();
+    return (UI[base] && UI[base][key]) || UI.en[key];
+  }
+  function isRtl() { return /^(ar|he|fa|ur)\b/i.test(page.locale || ""); }
+
+  /* Untouched default texts are shown in the shopper's language too. */
+  var DEFAULTS_EN = {
+    "chat.greeting": "Hi! I have a question about your store.",
+    "chat.popup.title": "Chat with us",
+    "chat.popup.text": "We usually reply within a few minutes.",
+    "chat.offlineText": "We're offline right now. Leave a message and we'll reply when we open.",
+    "chat.style.label": "Chat with us",
+    "chat.tooltip.text": "Need help? Chat with us 👋",
+    "discount.headline": "Get 10% off your first order",
+    "discount.subtext": "Use code {code} at checkout",
+    "discount.applyLabel": "Apply discount",
+    "discount.copyLabel": "Copy code",
+    "chat.productGreeting": "Hi! I have a question about {product}: {url}",
+  };
+  var DEFAULTS = {
+    hi: ["नमस्ते! मेरा आपके स्टोर के बारे में एक सवाल है।", "हमसे चैट करें", "हम आम तौर पर कुछ ही मिनटों में जवाब देते हैं।", "हम अभी ऑफ़लाइन हैं। मैसेज छोड़ें, खुलते ही जवाब देंगे।", "हमसे चैट करें", "मदद चाहिए? हमसे चैट करें 👋", "पहले ऑर्डर पर 10% छूट पाएँ", "चेकआउट पर कोड {code} लगाएँ", "छूट लगाएँ", "कोड कॉपी करें", "नमस्ते! मेरा {product} के बारे में एक सवाल है: {url}"],
+    es: ["¡Hola! Tengo una pregunta sobre tu tienda.", "Chatea con nosotros", "Solemos responder en pocos minutos.", "Ahora no estamos conectados. Déjanos un mensaje y te responderemos al abrir.", "Chatea con nosotros", "¿Necesitas ayuda? Escríbenos 👋", "10 % de descuento en tu primer pedido", "Usa el código {code} al pagar", "Aplicar descuento", "Copiar código", "¡Hola! Tengo una pregunta sobre {product}: {url}"],
+    pt: ["Olá! Tenho uma dúvida sobre a sua loja.", "Fale com a gente", "Costumamos responder em poucos minutos.", "Estamos offline agora. Deixe uma mensagem e responderemos quando abrirmos.", "Fale com a gente", "Precisa de ajuda? Fale com a gente 👋", "Ganhe 10% de desconto no primeiro pedido", "Use o código {code} no checkout", "Aplicar desconto", "Copiar código", "Olá! Tenho uma dúvida sobre {product}: {url}"],
+    fr: ["Bonjour ! J'ai une question sur votre boutique.", "Discutez avec nous", "Nous répondons généralement en quelques minutes.", "Nous sommes hors ligne. Laissez un message, nous répondrons à l'ouverture.", "Discutez avec nous", "Besoin d'aide ? Écrivez-nous 👋", "-10 % sur votre première commande", "Utilisez le code {code} au paiement", "Appliquer la réduction", "Copier le code", "Bonjour ! J'ai une question sur {product} : {url}"],
+    de: ["Hallo! Ich habe eine Frage zu eurem Shop.", "Chatte mit uns", "Wir antworten meist innerhalb weniger Minuten.", "Wir sind gerade offline. Hinterlass eine Nachricht, wir antworten, sobald wir da sind.", "Chatte mit uns", "Brauchst du Hilfe? Chatte mit uns 👋", "10 % Rabatt auf deine erste Bestellung", "Nutze den Code {code} an der Kasse", "Rabatt einlösen", "Code kopieren", "Hallo! Ich habe eine Frage zu {product}: {url}"],
+    ar: ["مرحبًا! لدي سؤال عن متجركم.", "تحدث معنا", "نرد عادةً خلال دقائق.", "نحن غير متصلين الآن. اترك رسالة وسنرد عند عودتنا.", "تحدث معنا", "تحتاج مساعدة؟ تحدث معنا 👋", "خصم 10% على طلبك الأول", "استخدم الرمز {code} عند الدفع", "تطبيق الخصم", "نسخ الرمز", "مرحبًا! لدي سؤال عن {product}: {url}"],
+  };
+
+  function setPath(obj, path, value) {
+    var keys = path.split("."), o = obj;
+    for (var i = 0; i < keys.length - 1 && o; i++) o = o[keys[i]];
+    if (o) o[keys[keys.length - 1]] = value;
+  }
+  function getPath(obj, path) {
+    return path.split(".").reduce(function (o, k) { return o == null ? undefined : o[k]; }, obj);
+  }
+
+  /** Texts for this language: the merchant's own translations first, then built-in ones for untouched defaults. */
+  function localize(cfg, locale) {
+    if (!cfg) return cfg;
+    var tr = cfg.translations || {};
+    var base = String(locale || "").split("-")[0].toLowerCase();
+    var texts = tr[locale] || tr[base];
+    if (!texts) for (var k in tr) if (k.split("-")[0] === base) { texts = tr[k]; break; }
+    var builtIn = DEFAULTS[base];
+    if (!texts && !builtIn) return cfg;
+    var out = JSON.parse(JSON.stringify(cfg));
+    var paths = Object.keys(DEFAULTS_EN);
+    for (var i = 0; i < paths.length; i++) {
+      var path = paths[i];
+      if (texts && texts[path]) setPath(out, path, texts[path]);
+      else if (builtIn && getPath(cfg, path) === DEFAULTS_EN[path]) setPath(out, path, builtIn[i]);
+    }
+    return out;
+  }
   var mobileQuery = window.matchMedia ? window.matchMedia("(max-width: 749px)") : { matches: false };
   function device() { return mobileQuery.matches ? "mobile" : "desktop"; }
 
@@ -155,7 +223,9 @@
       shop: p.shop || "",
       currency: p.currency || "INR",
       root: root,
+      locale: window.__WA_PREVIEW_LOCALE__ || p.locale || document.documentElement.lang || "en",
     };
+    if (config) config = localize(config, page.locale);
   }
 
   function cleanUrl() {
@@ -219,7 +289,7 @@
     var c = config && config.chat;
     if (!c) return [];
     return (c.agents || [])
-      .map(function (a) { return { name: (a.name || "").trim() || "Support", phone: normalizePhone(a.phone, c.countryCode) }; })
+      .map(function (a) { return { name: (a.name || "").trim() || L("support"), phone: normalizePhone(a.phone, c.countryCode) }; })
       .filter(function (a) { return a.phone; });
   }
 
@@ -233,6 +303,7 @@
     if (d.show === false && m.show === false) return;
 
     var root = document.createElement("div");
+    if (isRtl()) root.dir = "rtl";
     root.className = [
       "wa-chat",
       "wa-chat--" + (st.shape || "pill"),
@@ -252,11 +323,11 @@
 
     var popupOn = c.popup && c.popup.enabled !== false;
     root.innerHTML =
-      '<div class="wa-chat__tooltip" hidden><button type="button" class="wa-chat__tooltip-text"></button><button type="button" class="wa-chat__tooltip-x" aria-label="Close">&times;</button></div>' +
-      '<div class="wa-chat__popup" hidden role="dialog" aria-label="' + esc((c.popup && c.popup.title) || "Chat") + '">' +
-      '<div class="wa-chat__head"><strong class="wa-chat__title">' + esc(c.popup && c.popup.title) + '</strong><button type="button" class="wa-chat__close" aria-label="Close">&times;</button></div>' +
+      '<div class="wa-chat__tooltip" hidden><button type="button" class="wa-chat__tooltip-text"></button><button type="button" class="wa-chat__tooltip-x" aria-label="' + esc(L("close")) + '">&times;</button></div>' +
+      '<div class="wa-chat__popup" hidden role="dialog" aria-label="' + esc((c.popup && c.popup.title) || L("chat")) + '">' +
+      '<div class="wa-chat__head"><strong class="wa-chat__title">' + esc(c.popup && c.popup.title) + '</strong><button type="button" class="wa-chat__close" aria-label="' + esc(L("close")) + '">&times;</button></div>' +
       '<p class="wa-chat__text"></p><ul class="wa-chat__agents"></ul></div>' +
-      '<button type="button" class="wa-chat__bubble" aria-expanded="false" aria-label="' + esc(st.label || "Chat on WhatsApp") + '">' + icon(st.icon) +
+      '<button type="button" class="wa-chat__bubble" aria-expanded="false" aria-label="' + esc(st.label || L("chat")) + '">' + icon(st.icon) +
       (st.label ? '<span class="wa-chat__label">' + esc(st.label) + "</span>" : "") + "</button>";
     document.body.appendChild(root);
 
@@ -287,7 +358,7 @@
         btn.disabled = !open && !c.allowOffline;
         btn.innerHTML = '<span class="wa-chat__avatar" aria-hidden="true">' + esc(agent.name.charAt(0).toUpperCase()) + "</span>" +
           '<span class="wa-chat__agent-name">' + esc(agent.name) + "</span>" +
-          '<span class="wa-chat__status ' + (open ? "is-online" : "is-offline") + '">' + (open ? "Online" : "Offline") + "</span>";
+          '<span class="wa-chat__status ' + (open ? "is-online" : "is-offline") + '">' + (open ? L("online") : L("offline")) + "</span>";
         btn.addEventListener("click", function () { startChat(agent); });
         li.appendChild(btn);
         list.appendChild(li);
@@ -348,6 +419,7 @@
     var sub = esc(ds.subtext || "").replace(/\{code\}/g, codeHtml);
 
     var el = document.createElement("div");
+    if (isRtl()) el.dir = "rtl";
     el.className = [
       "wa-disc", "wa-disc--" + (ds.layout || "bar-top"), "wa-disc--" + (st.shape || "rounded"), "wa-disc--" + (st.size || "md"),
       ds.layout === "card" ? (chatLeft ? "wa-disc--right" : "wa-disc--left") : "",
@@ -355,18 +427,18 @@
     el.style.cssText = "--wa-dbg:" + (st.bg || "#1c1c1c") + ";--wa-dfg:" + (st.fg || "#fff") + ";--wa-dacc:" + (st.accent || "#f5c542");
     el.setAttribute("data-wa-widget", "discount");
     el.setAttribute("role", ds.layout === "popup" ? "dialog" : "region");
-    el.setAttribute("aria-label", ds.headline || "Discount");
+    el.setAttribute("aria-label", ds.headline || L("discount"));
     el.innerHTML =
       (ds.layout === "popup" ? '<div class="wa-disc__overlay"></div>' : "") +
       '<div class="wa-disc__box">' +
       '<div class="wa-disc__body"><p class="wa-disc__headline">' + esc(ds.headline) + "</p>" + (sub ? '<p class="wa-disc__sub">' + sub + "</p>" : "") + "</div>" +
       '<div class="wa-disc__actions">' +
       (applied
-        ? '<span class="wa-disc__applied">✓ Applied</span>'
-        : '<a class="wa-disc__btn wa-disc__btn--apply" href="' + esc(discountApplyUrl(ds.code, window.location.pathname + window.location.search)) + '">' + esc(ds.applyLabel || "Apply") + "</a>" +
-          '<button type="button" class="wa-disc__btn wa-disc__btn--copy">' + esc(ds.copyLabel || "Copy code") + "</button>") +
+        ? '<span class="wa-disc__applied">' + esc(L("applied")) + "</span>"
+        : '<a class="wa-disc__btn wa-disc__btn--apply" href="' + esc(discountApplyUrl(ds.code, window.location.pathname + window.location.search)) + '">' + esc(ds.applyLabel || L("apply")) + "</a>" +
+          '<button type="button" class="wa-disc__btn wa-disc__btn--copy">' + esc(ds.copyLabel || L("copy")) + "</button>") +
       "</div>" +
-      (ds.dismissible ? '<button type="button" class="wa-disc__x" aria-label="Dismiss">&times;</button>' : "") +
+      (ds.dismissible ? '<button type="button" class="wa-disc__x" aria-label="' + esc(L("dismiss")) + '">&times;</button>' : "") +
       "</div>";
 
     // Bottom bars (and the mobile bottom sheet) push the chat button up so they never overlap.
@@ -391,7 +463,7 @@
     var copy = el.querySelector(".wa-disc__btn--copy");
     if (copy) copy.addEventListener("click", function () {
       track("discount", "copy");
-      var done = function () { copy.textContent = "Copied!"; setTimeout(function () { copy.textContent = ds.copyLabel || "Copy code"; }, 1800); };
+      var done = function () { copy.textContent = L("copied"); setTimeout(function () { copy.textContent = ds.copyLabel || L("copy"); }, 1800); };
       if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ds.code).then(done, done);
       else done();
     });

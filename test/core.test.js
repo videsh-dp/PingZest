@@ -71,7 +71,8 @@ test("every default template renders with no missing vars when data is complete"
 test("getTemplateText prefers saved template", () => {
   assert.equal(getTemplateText([{ type: "shipped", lang: "en", body: "Custom" }], "shipped", "en"), "Custom");
   assert.equal(getTemplateText([], "shipped", "hi"), DEFAULT_TEMPLATES.shipped.hi);
-  assert.equal(getTemplateText(null, "shipped", "fr"), DEFAULT_TEMPLATES.shipped.en);
+  assert.equal(getTemplateText(null, "shipped", "fr"), DEFAULT_TEMPLATES.shipped.fr);
+  assert.equal(getTemplateText(null, "shipped", "xx"), DEFAULT_TEMPLATES.shipped.en);
 });
 
 test("isCodOrder recognises gateway names", () => {

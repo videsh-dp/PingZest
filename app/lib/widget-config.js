@@ -5,20 +5,21 @@
  * Pure module: used by the admin (editor + validation) and mirrored by the
  * storefront script (extensions/wa-widgets/assets/wa-widget.js).
  */
+import { N_ } from "../i18n/core.js";
 
 export const CONFIG_VERSION = 1;
 
 export const PAGE_TYPES = {
-  index: "Home page",
-  product: "Product pages",
-  collection: "Collection pages",
-  "list-collections": "All collections",
-  cart: "Cart",
-  search: "Search results",
-  page: "Content pages",
-  blog: "Blog",
-  article: "Blog posts",
-  "404": "Not found page",
+  index: N_("Home page"),
+  product: N_("Product pages"),
+  collection: N_("Collection pages"),
+  "list-collections": N_("All collections"),
+  cart: N_("Cart"),
+  search: N_("Search results"),
+  page: N_("Content pages"),
+  blog: N_("Blog"),
+  article: N_("Blog posts"),
+  "404": N_("Not found page"),
 };
 
 export const POSITIONS = ["bottom-right", "bottom-left"];
@@ -88,6 +89,7 @@ export function defaultConfig() {
       cart: { pages: { mode: "include", pageTypes: ["cart"], paths: [] } },
       share: { pages: allPages() },
     },
+    translations: {},
   };
 }
 
@@ -222,7 +224,47 @@ export function sanitizeConfig(input) {
       cart: { pages: sanitizePageRules(b.cart?.pages, d.buttons.cart.pages) },
       share: { pages: sanitizePageRules(b.share?.pages, d.buttons.share.pages) },
     },
+    translations: sanitizeTranslations(i.translations),
   };
+}
+
+/* ---------- per-language texts (mirrored in wa-widget.js) ---------- */
+
+/** Texts a merchant can translate per store language, with their max length. */
+export const TRANSLATABLE = {
+  "chat.style.label": 40,
+  "chat.tooltip.text": 80,
+  "chat.popup.title": 60,
+  "chat.popup.text": 160,
+  "chat.offlineText": 200,
+  "chat.greeting": 500,
+  "chat.productGreeting": 500,
+  "discount.headline": 80,
+  "discount.subtext": 140,
+  "discount.applyLabel": 30,
+  "discount.copyLabel": 30,
+};
+
+const LOCALE_RE = /^[a-z]{2,3}(-[A-Za-z]{2,4})?$/;
+
+/** { es: { "chat.greeting": "Hola…" }, … } — unknown keys and empty texts dropped. */
+export function sanitizeTranslations(input) {
+  const out = {};
+  if (!input || typeof input !== "object") return out;
+  for (const [locale, texts] of Object.entries(input).slice(0, 30)) {
+    if (!LOCALE_RE.test(locale) || !texts || typeof texts !== "object") continue;
+    const clean = {};
+    for (const [path, max] of Object.entries(TRANSLATABLE)) {
+      const v = typeof texts[path] === "string" ? texts[path].trim().slice(0, max) : "";
+      if (v) clean[path] = v;
+    }
+    if (Object.keys(clean).length) out[locale] = clean;
+  }
+  return out;
+}
+
+export function getPath(obj, path) {
+  return path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), obj);
 }
 
 /* ---------- page rules (mirrored in wa-widget.js) ---------- */

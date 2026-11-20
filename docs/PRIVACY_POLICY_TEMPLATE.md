@@ -33,7 +33,9 @@ We do not sell data or use it for advertising.
 
 ## Sharing
 We share data only with service providers needed to run the App: [hosting provider, e.g. Render, region],
-[database provider]. We will disclose data if the law requires it.
+[database provider], and, only when a merchant presses a translate button, Google Cloud Translation, which
+receives the widget or message-template text being translated (merchant-written text, never customer data).
+We will disclose data if the law requires it.
 
 ## Retention
 - Order and checkout records: kept while the App is installed; checkouts older than [30] days are deleted.

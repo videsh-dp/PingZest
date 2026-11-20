@@ -9,6 +9,7 @@
     "product": {% if product %}{{ product.title | json }}{% else %}null{% endif %},
     "shop": {{ shop.permanent_domain | json }},
     "currency": {{ cart.currency.iso_code | json }},
-    "root": {{ routes.root_url | json }}
+    "root": {{ routes.root_url | json }},
+    "locale": {{ request.locale.iso_code | json }}
   }
 </script>

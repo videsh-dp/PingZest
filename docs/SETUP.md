@@ -69,13 +69,16 @@ On development stores it works right away. Shopify reviews it when you submit to
 | Place a COD test order, then send the confirmation to your own phone | Store checkout → **COD confirmation** |
 | Tap the confirm link on your phone and watch the order get tagged | WhatsApp → `/c/…` page → Shopify **Orders** |
 | See message and widget numbers | **Analytics** (Messages / Widgets) |
+| Switch the app language (or let it follow your Shopify admin) | **Settings → Language** |
+| Translate widget texts for each store language; preview them | Shopify **Settings → Languages** (add one), then **Widgets → Languages** |
+| Translate a template with Google (needs `GOOGLE_TRANSLATE_API_KEY`) | **Message templates** → change Language → "Translate the text into…" |
 
 ## 6. Run the tests
 
 ```bash
-npm test                         # 46 unit tests (no Shopify needed)
+npm test                         # 75 unit tests (no Shopify needed)
 npx playwright install chromium  # once
-npm run test:widgets             # 17 browser checks of the storefront widgets
+npm run test:widgets             # 19 browser checks of the storefront widgets
 ```
 
 ## 7. Deploy to production
@@ -96,9 +99,10 @@ Fly.io has a Mumbai region if most of your merchants are in India.
    | `SHOPIFY_API_KEY` | Client ID (Dev Dashboard → your app) |
    | `SHOPIFY_API_SECRET` | Client secret |
    | `SHOPIFY_APP_URL` | Your server's public URL, e.g. `https://wa-assist.onrender.com` |
-   | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts` |
+   | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales` |
    | `DATABASE_URL` | Your Postgres connection string |
    | `NODE_ENV` | `production` |
+   | `GOOGLE_TRANSLATE_API_KEY` | Optional. Shows the "Auto-translate" / "Translate" buttons. Google Cloud → enable *Cloud Translation API* → Credentials → API key (restrict it to that API) |
 
 4. In `shopify.app.toml` set `application_url`, `redirect_urls` and `[app_proxy] url` to your server URL,
    then run `npm run deploy`. That publishes the config, webhooks and the theme app extension.

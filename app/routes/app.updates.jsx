@@ -4,7 +4,9 @@ import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
 import { updatesQueue, markUpdateSent, markDelivered, logSend } from "../models/orders.server";
 import { updateRowData, templatesFor, pickLang } from "../models/messages.server";
-import { Page, Card, Tabs, LangSwitch, SendButton, ActionButton, MessagePreview, EmptyState, timeAgo, useQueueTemplate, TemplatePicker } from "../components/ui";
+import { useT } from "../i18n/react.jsx";
+
+import { Page, Card, Tabs, LangSwitch, SendButton, ActionButton, MessagePreview, EmptyState, useQueueTemplate, TemplatePicker } from "../components/ui";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -17,6 +19,7 @@ export const loader = async ({ request }) => {
     lang,
     filter,
     templates: templatesFor(templates, kind),
+    langs: [...new Set(templates.filter((t) => t.type === kind).map((t) => t.lang))],
     rows: rows.map((o) => ({
       id: o.id,
       orderName: o.orderName,
@@ -45,57 +48,58 @@ export const action = async ({ request }) => {
 };
 
 export default function Updates() {
-  const { rows, lang, filter, templates } = useLoaderData();
+  const tr = useT();
+  const { rows, lang, filter, templates, langs } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
   const current = params.get("filter") || "shipped";
   const tabs = [
-    { id: "shipped", label: "Shipped" },
-    { id: "delivered", label: "Delivered" },
-    { id: "done", label: "Sent" },
+    { id: "shipped", label: tr("Shipped") },
+    { id: "delivered", label: tr("Delivered") },
+    { id: "done", label: tr("Sent") },
   ];
   return (
     <Page
-      title="Order updates"
-      subtitle="Shipping and delivery messages. Orders appear here when you fulfil them in Shopify."
-      actions={<div className="wa-row-gap">{filter !== "done" && <TemplatePicker templates={forLang} chosen={chosen} />}<LangSwitch lang={lang} /></div>}
+      title={tr("Order updates")}
+      subtitle={tr("Shipping and delivery messages. Orders appear here when you fulfil them in Shopify.")}
+      actions={<div className="wa-row-gap">{filter !== "done" && <TemplatePicker templates={forLang} chosen={chosen} />}<LangSwitch lang={lang} langs={langs} /></div>}
     >
       <Tabs tabs={tabs} />
       <Card>
         {rows.length === 0 ? (
-          <EmptyState title="Nothing to send">
+          <EmptyState title={tr("Nothing to send")}>
             {current === "delivered"
-              ? "Delivered orders appear when your courier marks them delivered, or when you mark them below in the Shipped tab."
-              : "Fulfil an order in Shopify to see it here."}
+              ? tr("Delivered orders appear when your courier marks them delivered, or when you mark them below in the Shipped tab.")
+              : tr("Fulfil an order in Shopify to see it here.")}
           </EmptyState>
         ) : (
           <table className="wa-table">
-            <thead><tr><th>Order</th><th>Customer</th><th>Tracking</th><th className="wa-right">Actions</th></tr></thead>
+            <thead><tr><th>{tr("Order")}</th><th>{tr("Customer")}</th><th>{tr("Tracking")}</th><th className="wa-right">{tr("Actions")}</th></tr></thead>
             <tbody>
               {rows.map((row) => ({ ...row, ...compose(row) })).map((r) => (
                 <tr key={r.id}>
                   <td>
                     <strong>{r.orderName}</strong>
                     <div className="wa-muted">
-                      {filter === "delivered" ? `delivered ${timeAgo(r.deliveredAt)}` : `shipped ${timeAgo(r.shippedAt)}`}
+                      {filter === "delivered" ? tr("delivered {when}", { when: tr.ago(r.deliveredAt) }) : tr("shipped {when}", { when: tr.ago(r.shippedAt) })}
                     </div>
                   </td>
                   <td>
                     {r.customerName || "—"}
-                    <div className="wa-muted">{r.phoneDisplay}</div>
+                    <div className="wa-muted"><bdi dir="ltr">{r.phoneDisplay}</bdi></div>
                     <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
                   </td>
-                  <td>{r.trackingUrl ? <a href={r.trackingUrl} target="_blank" rel="noopener noreferrer">Track</a> : <span className="wa-muted">No tracking link</span>}</td>
+                  <td>{r.trackingUrl ? <a href={r.trackingUrl} target="_blank" rel="noopener noreferrer">{tr("Track")}</a> : <span className="wa-muted">{tr("No tracking link")}</span>}</td>
                   <td className="wa-right">
                     <div className="wa-actions">
                       {filter === "shipped" && <SendButton link={r.link} intent="sent" id={r.id} extra={{ kind: "shipped", ...sendExtra }} />}
                       {filter === "delivered" && <SendButton link={r.link} intent="sent" id={r.id} extra={{ kind: "delivered", ...sendExtra }} />}
-                      {filter === "shipped" && !r.deliveredAt && <ActionButton intent="delivered" id={r.id}>Mark delivered</ActionButton>}
+                      {filter === "shipped" && !r.deliveredAt && <ActionButton intent="delivered" id={r.id}>{tr("Mark delivered")}</ActionButton>}
                       {filter === "done" && (
                         <span className="wa-muted">
-                          {r.shippedMsgSentAt && `shipped msg ${timeAgo(r.shippedMsgSentAt)}`}
-                          {r.deliveredMsgSentAt && ` · delivered msg ${timeAgo(r.deliveredMsgSentAt)}`}
+                          {r.shippedMsgSentAt && tr("shipping message {when}", { when: tr.ago(r.shippedMsgSentAt) })}
+                          {r.deliveredMsgSentAt && ` · ${tr("delivery message {when}", { when: tr.ago(r.deliveredMsgSentAt) })}`}
                         </span>
                       )}
                     </div>

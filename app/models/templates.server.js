@@ -5,19 +5,23 @@
 import prisma from "../db.server";
 import { DEFAULT_TEMPLATES, TEMPLATE_TYPES, LANGUAGES, validateTemplate } from "../lib/templates.js";
 import { prefillWarning } from "../lib/whatsapp.js";
+import { N_ } from "../i18n/core.js";
 
 export { validateTemplate };
 
 export async function ensureTemplates(shop) {
-  const count = await prisma.messageTemplate.count({ where: { shop } });
-  if (count > 0) return;
+  // Seeds a "Standard" template for every stage × language that has none yet,
+  // so new languages appear for existing shops too.
+  const have = await prisma.messageTemplate.findMany({ where: { shop }, select: { type: true, lang: true }, distinct: ["type", "lang"] });
+  const seen = new Set(have.map((t) => `${t.type}:${t.lang}`));
   const rows = [];
   for (const type of Object.keys(TEMPLATE_TYPES)) {
     for (const lang of Object.keys(LANGUAGES)) {
-      rows.push({ shop, type, lang, name: "Standard", body: DEFAULT_TEMPLATES[type][lang], isDefault: true });
+      const body = DEFAULT_TEMPLATES[type][lang];
+      if (body && !seen.has(`${type}:${lang}`)) rows.push({ shop, type, lang, name: "Standard", body, isDefault: true });
     }
   }
-  await prisma.messageTemplate.createMany({ data: rows });
+  if (rows.length) await prisma.messageTemplate.createMany({ data: rows });
 }
 
 export async function listTemplates(shop) {
@@ -44,7 +48,7 @@ export async function createTemplate(shop, input) {
 
 export async function updateTemplate(shop, id, input) {
   const current = await prisma.messageTemplate.findFirst({ where: { id, shop } });
-  if (!current) return { error: "Template not found." };
+  if (!current) return { error: N_("Template not found.") };
   const data = { type: current.type, lang: input.lang || current.lang, name: String(input.name ?? current.name).trim().slice(0, 60), body: String(input.body ?? current.body).trim() };
   const error = validateTemplate(data);
   if (error) return { error };
@@ -64,7 +68,7 @@ export async function updateTemplate(shop, id, input) {
 
 export async function duplicateTemplate(shop, id) {
   const t = await prisma.messageTemplate.findFirst({ where: { id, shop } });
-  if (!t) return { error: "Template not found." };
+  if (!t) return { error: N_("Template not found.") };
   const copy = await prisma.messageTemplate.create({
     data: { shop, type: t.type, lang: t.lang, name: `${t.name} (copy)`.slice(0, 60), body: t.body, isDefault: false },
   });
@@ -73,16 +77,16 @@ export async function duplicateTemplate(shop, id) {
 
 export async function setDefaultTemplate(shop, id) {
   const t = await prisma.messageTemplate.findFirst({ where: { id, shop } });
-  if (!t) return { error: "Template not found." };
+  if (!t) return { error: N_("Template not found.") };
   await makeDefault(shop, id, t.type, t.lang);
   return { ok: true, id };
 }
 
 export async function deleteTemplate(shop, id) {
   const t = await prisma.messageTemplate.findFirst({ where: { id, shop } });
-  if (!t) return { error: "Template not found." };
+  if (!t) return { error: N_("Template not found.") };
   const siblings = await prisma.messageTemplate.count({ where: { shop, type: t.type, lang: t.lang } });
-  if (siblings <= 1) return { error: "Keep at least one template for each stage and language. Edit this one instead." };
+  if (siblings <= 1) return { error: N_("Keep at least one template for each stage and language. Edit this one instead.") };
   await prisma.messageTemplate.delete({ where: { id } });
   if (t.isDefault) {
     const next = await prisma.messageTemplate.findFirst({ where: { shop, type: t.type, lang: t.lang }, orderBy: { createdAt: "asc" } });

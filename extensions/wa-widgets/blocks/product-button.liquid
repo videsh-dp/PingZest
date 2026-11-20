@@ -1,15 +1,18 @@
 {%- comment -%} App block for product pages: "Ask on WhatsApp" with the product already in the message. {%- endcomment -%}
 {%- assign s = block.settings -%}
+{%- comment -%} Untouched default texts follow the shopper's language (locales/*.json). {%- endcomment -%}
+{%- assign t_label = s.label -%}{%- if t_label == "Ask about this product" -%}{%- assign t_label = 'blocks.product_button.label' | t -%}{%- endif -%}
+{%- assign t_message = s.message -%}{%- if t_message == "Hi! I'd like to know more about {product}: {url}" -%}{%- assign t_message = 'blocks.product_button.message' | t -%}{%- endif -%}
 {% render 'wa-config' %}
 <div class="wa-block" data-wa-block="product" {{ block.shopify_attributes }}>
   <a href="#" class="wa-btn"
     data-wa-widget="product"
     data-phone="{{ s.phone | escape }}"
     data-country-code="{{ s.country_code | escape }}"
-    data-message="{{ s.message | escape }}"
+    data-message="{{ t_message | escape }}"
     data-product="{{ product.title | escape }}"
     rel="noopener" target="_blank">
-    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+    {% render 'wa-icon' %}<span>{{ t_label | escape }}</span>
   </a>
 </div>
 

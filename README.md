@@ -30,13 +30,19 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | Queues | Template picker on each queue: switch templates and the messages update instantly | – |
 | **Message analytics** | Messages sent per day and by stage, COD confirm/cancel rate, median reply time, checkout recovery rate and sales, **template performance** | – |
 | Public | `/c/:token` confirm page: customer taps Confirm/Cancel → order tagged in Shopify | – |
+| **Languages** | Admin in **7 languages** (English, हिन्दी, Español, Português (Brasil), Français, Deutsch, العربية with right-to-left layout). Follows the Shopify admin language, or pick one in Settings. Numbers, money, dates and plurals use the built-in `Intl` library | – |
+| Languages | Storefront widgets speak the **shopper's language**: built-in labels and untouched default texts in all 7 languages, plus your own per-language texts (Widgets → Languages) for every store language | `read_locales` |
+| Languages | Default message templates in all 7 languages; confirm page in the customer's language (message language → browser → shop default) | – |
+| Languages | Optional **Google Translate** drafts: "Auto-translate empty fields" for widget texts, "Translate the text into…" for templates. `{variables}`, links and WhatsApp formatting are protected. Nothing is translated on page load | `GOOGLE_TRANSLATE_API_KEY` (optional) |
 | Compliance | `customers/data_request`, `customers/redact`, `shop/redact` webhooks | Required for the App Store |
 
 Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots/templates.png) ·
 [message analytics](docs/screenshots/analytics-messages.png) · [widgets editor](docs/screenshots/widgets-editor.png) · [storefront](docs/screenshots/storefront-desktop.png) ·
 [another design](docs/screenshots/storefront-design-variant.png) · [mobile](docs/screenshots/storefront-mobile.png) ·
 [analytics](docs/screenshots/analytics.png) · [discounts](docs/screenshots/discounts.png) · [COD queue](docs/screenshots/cod.png) ·
-[templates](docs/screenshots/templates.png) · [confirm page](docs/screenshots/confirm.png)
+[templates](docs/screenshots/templates.png) · [confirm page](docs/screenshots/confirm.png) ·
+[analytics in Spanish](docs/screenshots/analytics-es.png) · [templates in Arabic](docs/screenshots/templates-ar.png) ·
+[storefront in Arabic](docs/screenshots/storefront-ar.png) · [confirm page in Arabic](docs/screenshots/confirm-ar.png)
 
 ## How widget settings reach the store
 
@@ -59,6 +65,30 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 4. The customer taps it and chooses **Confirm** or **Cancel**. The order gets the `wa-cod-confirmed` or
    `wa-cod-cancelled` tag in Shopify, and the queue updates.
 5. The merchant filters cancelled orders in Shopify and cancels them before shipping. The app never cancels orders itself.
+
+## Languages
+
+- **Admin text** is written in English in the code (`tr("Save changes")`) and looked up in
+  `app/i18n/locales/<lang>.json`. A missing translation falls back to English, so nothing breaks.
+- **Which language:** Settings → App language. "Same as my Shopify admin" uses the `locale` Shopify sends
+  when the app opens, then the browser language.
+- **Storefront:** the theme passes `request.locale` to the widget. Built-in labels and default texts are
+  translated in `wa-widget.js` and `extensions/wa-widgets/locales/*.json`; anything the merchant wrote stays as
+  written unless they add a translation under Widgets → Languages.
+- **Google Translate is optional and only runs when a merchant clicks a translate button.** Set
+  `GOOGLE_TRANSLATE_API_KEY` (Google Cloud → APIs → Cloud Translation API → Credentials) to show the buttons.
+  Google charges per character after its free monthly allowance; a full widget translation is about 1,000 characters.
+
+**Add a language** (e.g. Japanese):
+
+```bash
+GOOGLE_TRANSLATE_API_KEY=... node scripts/translate-locale.mjs ja   # drafts app/i18n/locales/ja.json
+```
+
+Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.js`, add confirm-page texts in
+`app/i18n/confirm.js`, default templates in `app/lib/templates.js`, and storefront texts in `wa-widget.js` and
+`extensions/wa-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
+string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
 
 ## How login works
 
@@ -102,11 +132,12 @@ Also check `ApiVersion` in `app/shopify.server.js` and `api_version` in `shopify
 ## Tests
 
 ```bash
-npm test                 # 46 unit tests: phone cleanup, templates (picking, validation), WhatsApp
+npm test                 # 75 unit tests: phone cleanup, templates (picking, validation), WhatsApp
                          # formatting, links, order parsing, tokens, widget settings, page rules,
-                         # discount form, message analytics, store-address login input
-npm run test:widgets     # 17 browser checks of the storefront: designs, mobile, page rules, banner,
-                         # copy/apply, tracking (needs `npx playwright install chromium`)
+                         # discount form, message analytics, store-address login input, languages
+                         # (every string translated, placeholders and plurals intact, Intl formatting)
+npm run test:widgets     # 19 browser checks of the storefront: designs, mobile, page rules, banner,
+                         # copy/apply, tracking, shopper language and right-to-left (needs `npx playwright install chromium`)
 ```
 
 ## Project layout
@@ -114,6 +145,7 @@ npm run test:widgets     # 17 browser checks of the storefront: designs, mobile,
 ```
 app/lib/            Pure logic, unit-tested (phone, templates, whatsapp-format, compose, orders, tokens,
                     widget-config, discounts, preview, message-stats, shop)
+app/i18n/           core.js (languages, tr(), Intl formatting) · react.jsx (useT) · locales/*.json · confirm.js
 app/models/         Database + Shopify Admin API helpers (*.server.js)
 app/routes/         app.* = admin pages (widgets, discounts, analytics, cod, carts, updates, templates, settings)
                     webhooks.* · proxy.track · c.$token (public confirm page)
@@ -121,6 +153,7 @@ app/components/     ui.jsx (admin UI kit, WhatsApp bubble, template picker) · f
                     DailyChart.jsx (SVG chart) · Landing.jsx (login page)
 extensions/wa-widgets/ Theme app extension: app embed (chat + banner) + product/cart/share/opt-in blocks
 prisma/schema.prisma   Sessions, settings, templates, orders, checkouts, widget click counters
+scripts/            extract-i18n.mjs (list/check UI strings) · translate-locale.mjs (Google draft of a new language)
 docs/               SETUP.md, App Store checklist, privacy policy template, screenshots
 ```
 
@@ -129,7 +162,7 @@ docs/               SETUP.md, App Store checklist, privacy policy template, scre
 - **Database:** switch `provider` to `postgresql` in `prisma/schema.prisma`, set `DATABASE_URL`, and run
   `npx prisma migrate dev --name init` once to create migrations. Then use `prisma migrate deploy` in the `setup` script instead of `db push`.
 - **Hosting:** any Node host (Render, Railway, Fly.io). Set `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`,
-  `SHOPIFY_APP_URL`, `SCOPES`, `DATABASE_URL`, then run `npm run build && npm run docker-start`.
+  `SHOPIFY_APP_URL`, `SCOPES`, `DATABASE_URL` (and optionally `GOOGLE_TRANSLATE_API_KEY`), then run `npm run build && npm run docker-start`.
 - **Deploy config and the theme extension:** `npm run deploy`.
 - Before submitting, work through [docs/APP_STORE_CHECKLIST.md](docs/APP_STORE_CHECKLIST.md).
 

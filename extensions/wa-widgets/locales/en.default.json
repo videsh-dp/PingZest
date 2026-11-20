@@ -1,7 +1,23 @@
 {
-  "widgets": {
-    "online": "Online",
-    "offline": "Offline",
-    "close": "Close"
+  "blocks": {
+    "product_button": {
+      "label": "Ask about this product",
+      "message": "Hi! I'd like to know more about {product}: {url}"
+    },
+    "share_button": {
+      "label": "Share on WhatsApp",
+      "message": "Look what I found: {product} {url}"
+    },
+    "cart_order": {
+      "label": "Order on WhatsApp",
+      "intro": "Hi! I'd like to order:",
+      "outro": "Please confirm availability and delivery.",
+      "empty_text": "Hi! I'd like help placing an order.",
+      "note": "Prefer to chat? Send your cart to us on WhatsApp."
+    },
+    "optin": {
+      "label": "Send me order updates on WhatsApp",
+      "help": "We'll only message you about this order. Reply STOP anytime."
+    }
   }
 }

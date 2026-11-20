@@ -33,12 +33,13 @@ const PAGES = {
       '<div class="wa-block" data-wa-block="cart"><a href="#" class="wa-btn wa-btn--wide" data-wa-widget="cart" data-phone="" data-intro="Hi! I\'d like to order:" data-outro="Please confirm availability." data-empty="Hi!">' + ICON + "<span>Order on WhatsApp</span></a></div></div>",
   },
 };
-export const PREVIEW_PAGES = { index: "Home", product: "Product", collection: "Collection", cart: "Cart" };
+export const PREVIEW_PAGES = { index: "Home page", product: "Product page", collection: "Collection page", cart: "Cart page" }; // labels translated in the editor
 
-export function previewHtml({ config, pageType = "product", storeName = "Your Store", css = "", js = "" }) {
+export function previewHtml({ config, pageType = "product", storeName = "Your Store", css = "", js = "", locale = "en" }) {
   const p = PAGES[pageType] || PAGES.product;
-  const pageCtx = { pageType, product: p.product || null, shop: "preview.myshopify.com", currency: "INR", root: "/" };
-  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  const pageCtx = { pageType, product: p.product || null, shop: "preview.myshopify.com", currency: "INR", root: "/", locale };
+  const rtl = /^(ar|he|fa|ur)\b/i.test(locale);
+  return `<!doctype html><html lang="${esc(locale)}"${rtl ? ' dir="rtl"' : ""}><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(p.title)}</title>
 <style>
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f7f7f5;color:#222;min-height:100vh}

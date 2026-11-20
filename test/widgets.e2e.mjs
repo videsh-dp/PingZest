@@ -300,6 +300,39 @@ try {
     assert.ok(o.at(-1).startsWith("https://wa.me/?text="));
     assert.deepEqual(errs, []);
   });
+
+  await check("shopper language: built-in labels and untouched defaults in Spanish, merchant translations win", async () => {
+    const { page: p, opened: o, errors: errs } = await newPage();
+    await p.goto(scenario("es", (c) => {
+      c.chat.tooltip.enabled = false;
+      c.translations = { es: { "chat.popup.title": "¡Hablemos!", "discount.headline": "10 % menos hoy" } };
+    }, { locale: "es" }));
+    await p.waitForSelector(".wa-disc");
+    assert.equal((await p.textContent(".wa-disc__headline"))?.trim(), "10 % menos hoy");
+    assert.match(await p.textContent(".wa-disc"), /Copiar código/);
+    assert.match(await p.textContent(".wa-disc"), /Aplicar descuento/);
+    await p.click(".wa-chat__bubble");
+    await p.waitForSelector(".wa-chat__popup:not([hidden])");
+    assert.equal((await p.textContent(".wa-chat__title"))?.trim(), "¡Hablemos!");
+    assert.equal(await p.getAttribute(".wa-chat__close", "aria-label"), "Cerrar");
+    await p.click(".wa-chat__agent >> nth=0");
+    await p.waitForTimeout(100);
+    assert.match(text(o.at(-1)), /^¡Hola! Tengo una pregunta sobre Blue Cotton Kurta/);
+    assert.deepEqual(errs, []);
+  });
+
+  await check("shopper language: Arabic sets right-to-left; unknown language keeps the store's texts", async () => {
+    const { page: p } = await newPage();
+    await p.goto(scenario("ar", null, { locale: "ar" }));
+    await p.waitForSelector(".wa-chat");
+    assert.equal(await p.getAttribute(".wa-chat", "dir"), "rtl");
+    assert.match(await p.textContent(".wa-disc"), /نسخ الرمز/);
+    const { page: p2 } = await newPage();
+    await p2.goto(scenario("ja", null, { locale: "ja" }));
+    await p2.waitForSelector(".wa-disc");
+    assert.match(await p2.textContent(".wa-disc"), /Copy code/);
+    await p.screenshot({ path: path.join(shotDir, "storefront-ar.png") });
+  });
 } finally {
   await browser.close();
   server.close();

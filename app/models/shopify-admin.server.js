@@ -180,3 +180,15 @@ export async function deleteCodeDiscount(admin, gid) {
   const errors = data.discountCodeDelete?.userErrors || [];
   return errors.length ? { error: errors.map((e) => e.message).join("; ") } : { ok: true };
 }
+
+/** The store's languages (Settings → Languages): [{ locale: "es", name: "Spanish", primary, published }]. */
+export async function getShopLocales(admin) {
+  try {
+    const data = await gql(admin, `#graphql
+      query shopLocales { shopLocales { locale name primary published } }`);
+    return data.shopLocales || [];
+  } catch (e) {
+    console.error("shopLocales failed", e?.message);
+    return null; // unknown (e.g. scope not granted yet)
+  }
+}

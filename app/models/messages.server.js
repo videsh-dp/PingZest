@@ -4,6 +4,7 @@
  */
 import { orderVars, checkoutVars } from "../lib/orders.js";
 import { formatPhone } from "../lib/phone.js";
+import { LOCALES } from "../i18n/core.js";
 
 export function appUrl() {
   return (process.env.SHOPIFY_APP_URL || "").replace(/\/$/, "");
@@ -45,5 +46,5 @@ export function templatesFor(templates, type) {
 /** Language for this page: ?lang= overrides the shop default. */
 export function pickLang(request, settings) {
   const q = new URL(request.url).searchParams.get("lang");
-  return ["en", "hi"].includes(q) ? q : settings.defaultLang || "en";
+  return LOCALES[q] ? q : LOCALES[settings.defaultLang] ? settings.defaultLang : "en";
 }

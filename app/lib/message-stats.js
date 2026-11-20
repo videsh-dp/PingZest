@@ -4,8 +4,9 @@
  * orders:    Order rows        { isCod, codStatus, codSentAt, codRespondedAt, codRespondedBy, codTemplateId }
  * checkouts: Checkout rows     { status, sentAt, recovered, totalPrice, currency, templateId }
  */
+import { N_ } from "../i18n/core.js";
 
-export const KINDS = { cod_confirm: "COD confirmation", abandoned_cart: "Abandoned checkout", shipped: "Shipped", delivered: "Delivered" };
+export const KINDS = { cod_confirm: N_("COD confirmation"), abandoned_cart: N_("Abandoned checkout"), shipped: N_("Shipped"), delivered: N_("Delivered") };
 
 const DAY = 86400000;
 export function dayRange(days, now = new Date()) {
@@ -78,7 +79,7 @@ export function computeMessageStats({ logs = [], orders = [], checkouts = [], te
   const templateRows = [...perTpl.values()]
     .map((r) => ({
       ...r,
-      outcomeLabel: r.kind === "cod_confirm" ? "confirmed" : r.kind === "abandoned_cart" ? "recovered" : null,
+      outcomeLabel: r.kind === "cod_confirm" ? N_("confirmed") : r.kind === "abandoned_cart" ? N_("recovered") : null,
       outcomeRate: r.kind === "cod_confirm" || r.kind === "abandoned_cart" ? rate(r.good, r.base) : null,
     }))
     .sort((a, b) => b.sends - a.sends);

@@ -6,9 +6,11 @@ import { codQueue, COD_FILTERS, markCodSent, setCodStatus, logSend } from "../mo
 import { codRowData, templatesFor, pickLang } from "../models/messages.server";
 import { tagOrder, removeOrderTags } from "../models/shopify-admin.server";
 import { formatMoney } from "../lib/orders.js";
+import { useT } from "../i18n/react.jsx";
+
 import prisma from "../db.server";
 import {
-  Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState, timeAgo,
+  Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState,
   useQueueTemplate, TemplatePicker,
 } from "../components/ui";
 
@@ -27,6 +29,7 @@ export const loader = async ({ request }) => {
   return {
     lang,
     templates: templatesFor(templates, "cod_confirm"),
+    langs: [...new Set(templates.filter((t) => t.type === "cod_confirm").map((t) => t.lang))],
     counts: {
       todo: countBy.pending || 0, waiting: countBy.sent || 0, confirmed: countBy.confirmed || 0,
       cancelled: countBy.cancelled || 0, no_reply: countBy.no_reply || 0,
@@ -74,58 +77,59 @@ export const action = async ({ request }) => {
 };
 
 export default function CodQueue() {
-  const { rows, counts, lang, templates } = useLoaderData();
+  const tr = useT();
+  const { rows, counts, lang, templates, langs } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
   const filter = params.get("filter") || "todo";
-  const tabs = Object.entries(COD_FILTERS).map(([id, f]) => ({ id, label: f.label, count: counts[id] }));
+  const tabs = Object.entries(COD_FILTERS).map(([id, f]) => ({ id, label: tr(f.label), count: counts[id] }));
 
   return (
     <Page
-      title="COD confirmation"
-      subtitle="Confirm Cash on Delivery orders before you ship. Customers tap the link in the message to confirm or cancel."
-      actions={<div className="wa-row-gap"><TemplatePicker templates={forLang} chosen={chosen} /><LangSwitch lang={lang} /></div>}
+      title={tr("COD confirmation")}
+      subtitle={tr("Confirm Cash on Delivery orders before you ship. Customers tap the link in the message to confirm or cancel.")}
+      actions={<div className="wa-row-gap"><TemplatePicker templates={forLang} chosen={chosen} /><LangSwitch lang={lang} langs={langs} /></div>}
     >
       <Tabs tabs={tabs} />
       <Card>
         {rows.length === 0 ? (
-          <EmptyState title={filter === "todo" ? "All caught up 🎉" : "Nothing here yet"}>
-            {filter === "todo" ? "New COD orders appear here automatically." : null}
+          <EmptyState title={filter === "todo" ? tr("All caught up 🎉") : tr("Nothing here yet")}>
+            {filter === "todo" ? tr("New COD orders appear here automatically.") : null}
           </EmptyState>
         ) : (
           <table className="wa-table">
             <thead>
-              <tr><th>Order</th><th>Customer</th><th>Amount</th><th>Status</th><th className="wa-right">Actions</th></tr>
+              <tr><th>{tr("Order")}</th><th>{tr("Customer")}</th><th>{tr("Amount")}</th><th>{tr("Status")}</th><th className="wa-right">{tr("Actions")}</th></tr>
             </thead>
             <tbody>
               {rows.map((row) => ({ ...row, ...compose(row) })).map((r) => (
                 <tr key={r.id}>
                   <td>
                     <strong>{r.orderName}</strong>
-                    <div className="wa-muted">{timeAgo(r.createdAt)}</div>
+                    <div className="wa-muted">{tr.ago(r.createdAt)}</div>
                   </td>
                   <td>
                     {r.customerName || "—"}
-                    <div className="wa-muted">{r.phoneDisplay || "No phone"}{r.optIn ? " · opted in" : ""}</div>
+                    <div className="wa-muted">{r.phoneDisplay ? <bdi dir="ltr">{r.phoneDisplay}</bdi> : tr("No phone")}{r.optIn ? ` · ${tr("opted in")}` : ""}</div>
                     <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
                   </td>
                   <td>{r.amount}</td>
                   <td>
                     <StatusBadge status={r.status} />
-                    {r.sentAt && r.status === "sent" && <div className="wa-muted">sent {timeAgo(r.sentAt)}</div>}
-                    {r.respondedBy === "customer" && <div className="wa-muted">by customer</div>}
+                    {r.sentAt && r.status === "sent" && <div className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</div>}
+                    {r.respondedBy === "customer" && <div className="wa-muted">{tr("by customer")}</div>}
                   </td>
                   <td className="wa-right">
                     <div className="wa-actions">
                       {(r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
-                        <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? "Send on WhatsApp" : "Send again"} />
+                        <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? tr("Send on WhatsApp") : tr("Send again")} />
                       )}
-                      {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>Mark confirmed</ActionButton>}
+                      {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
                       {r.status !== "cancelled" && (
-                        <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText="Mark this order as cancelled by the customer?">Cancelled</ActionButton>
+                        <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText={tr("Mark this order as cancelled by the customer?")}>{tr("Cancelled")}</ActionButton>
                       )}
-                      {r.status === "sent" && <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }}>No reply</ActionButton>}
+                      {r.status === "sent" && <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }}>{tr("No reply")}</ActionButton>}
                     </div>
                   </td>
                 </tr>
@@ -135,8 +139,7 @@ export default function CodQueue() {
         )}
       </Card>
       <p className="wa-muted wa-footnote">
-        Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders.
-        WA Assist doesn't cancel orders for you.
+        {tr("Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders. WA Assist doesn't cancel orders for you.")}
       </p>
     </Page>
   );

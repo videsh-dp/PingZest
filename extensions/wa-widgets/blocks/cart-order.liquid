@@ -3,20 +3,26 @@
   Reads the live cart (/cart.js) when tapped and sends the item list and total to the store.
 {%- endcomment -%}
 {%- assign s = block.settings -%}
+{%- comment -%} Untouched default texts follow the shopper's language (locales/*.json). {%- endcomment -%}
+{%- assign t_label = s.label -%}{%- if t_label == "Order on WhatsApp" -%}{%- assign t_label = 'blocks.cart_order.label' | t -%}{%- endif -%}
+{%- assign t_intro = s.intro -%}{%- if t_intro == "Hi! I'd like to order:" -%}{%- assign t_intro = 'blocks.cart_order.intro' | t -%}{%- endif -%}
+{%- assign t_outro = s.outro -%}{%- if t_outro == "Please confirm availability and delivery." -%}{%- assign t_outro = 'blocks.cart_order.outro' | t -%}{%- endif -%}
+{%- assign t_empty_text = s.empty_text -%}{%- if t_empty_text == "Hi! I'd like help placing an order." -%}{%- assign t_empty_text = 'blocks.cart_order.empty_text' | t -%}{%- endif -%}
+{%- assign t_note = s.note -%}{%- if t_note == "Prefer to chat? Send your cart to us on WhatsApp." -%}{%- assign t_note = 'blocks.cart_order.note' | t -%}{%- endif -%}
 {% render 'wa-config' %}
 <div class="wa-block" data-wa-block="cart" {{ block.shopify_attributes }}>
   <a href="#" class="wa-btn wa-btn--wide"
     data-wa-widget="cart"
     data-phone="{{ s.phone | escape }}"
     data-country-code="{{ s.country_code | escape }}"
-    data-intro="{{ s.intro | escape }}"
-    data-outro="{{ s.outro | escape }}"
-    data-empty="{{ s.empty_text | escape }}"
+    data-intro="{{ t_intro | escape }}"
+    data-outro="{{ t_outro | escape }}"
+    data-empty="{{ t_empty_text | escape }}"
     data-currency="{{ cart.currency.iso_code }}"
     rel="noopener" target="_blank">
-    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+    {% render 'wa-icon' %}<span>{{ t_label | escape }}</span>
   </a>
-  {%- if s.note != blank -%}<p class="wa-note">{{ s.note | escape }}</p>{%- endif -%}
+  {%- if t_note != blank -%}<p class="wa-note">{{ t_note | escape }}</p>{%- endif -%}
 </div>
 
 {% schema %}
