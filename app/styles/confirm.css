@@ -1,0 +1,37 @@
+/* Public confirm page: mobile-first, opened from WhatsApp's in-app browser. */
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: #efeae2;
+  color: #1c1c1c;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+}
+.cf { min-height: 100vh; display: flex; align-items: flex-start; justify-content: center; padding: 28px 16px; }
+.cf__card {
+  width: 100%; max-width: 440px;
+  background: #fff; border-radius: 18px; padding: 24px 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+.cf__store { margin: 0 0 14px; font-weight: 700; color: #1f8f4e; letter-spacing: 0.02em; }
+.cf__title { margin: 0 0 6px; font-size: 22px; line-height: 1.25; }
+.cf__lead { margin: 0 0 18px; color: #555; }
+.cf__result { text-align: center; padding: 6px 0 4px; }
+.cf__icon { font-size: 44px; display: block; margin-bottom: 8px; }
+.cf__summary { margin: 0 0 20px; border: 1px solid #ececec; border-radius: 12px; overflow: hidden; }
+.cf__summary > div { display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; }
+.cf__summary > div + div { border-top: 1px solid #ececec; }
+.cf__summary dt { font-weight: 600; flex: none; }
+.cf__summary dd { margin: 0; text-align: right; color: #444; }
+.cf__amount { font-weight: 700; font-size: 18px; color: #1c1c1c !important; }
+.cf__actions { display: flex; flex-direction: column; gap: 10px; }
+.cf__change { margin: 0; text-align: center; color: #666; font-size: 14px; }
+.cf__btn {
+  width: 100%; min-height: 54px; border-radius: 12px;
+  font: inherit; font-size: 17px; font-weight: 700; cursor: pointer;
+}
+.cf__btn--yes { background: #1f8f4e; color: #fff; border: 0; }
+.cf__btn--yes:active { background: #17733e; }
+.cf__btn--no { background: #fff; color: #b42318; border: 2px solid #f1b4ae; }
+.cf__btn:disabled { opacity: 0.6; }
+.cf__note { background: #fff4d6; padding: 10px 12px; border-radius: 10px; font-size: 14px; }
+.cf__chat { display: block; text-align: center; margin-top: 18px; color: #1f8f4e; font-weight: 600; }

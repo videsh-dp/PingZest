@@ -1,0 +1,31 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", sans-serif; color: #1c1c1c; background: #f4f6f3; }
+.lp { min-height: 100vh; display: grid; grid-template-columns: 1.15fr 1fr; gap: 48px; align-items: center; max-width: 1080px; margin: 0 auto; padding: 48px 24px; }
+.lp__brand { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 18px; margin: 0 0 28px; }
+.lp__logo { color: #1f8f4e; font-size: 22px; line-height: 1; }
+.lp__title { font-size: clamp(30px, 4vw, 44px); line-height: 1.1; margin: 0 0 14px; letter-spacing: -0.02em; }
+.lp__lead { font-size: 18px; color: #4a4a4a; margin: 0 0 28px; max-width: 520px; line-height: 1.5; }
+.lp__features { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lp__features li { display: flex; gap: 12px; background: #fff; border-radius: 12px; padding: 14px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05); }
+.lp__features li > span { font-size: 22px; }
+.lp__features div { display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.lp__features div span { color: #616161; }
+.lp__card { background: #fff; border-radius: 18px; padding: 32px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(0, 0, 0, 0.04); }
+.lp__card h2 { margin: 0 0 8px; font-size: 22px; }
+.lp__muted { color: #616161; margin: 0 0 18px; line-height: 1.5; }
+.lp__small { font-size: 13px; margin: 18px 0 0; }
+.lp__ok { background: #e3f6ea; color: #0c5c2f; padding: 8px 12px; border-radius: 8px; }
+.lp__form { display: flex; flex-direction: column; gap: 8px; }
+.lp__label { font-weight: 600; font-size: 14px; }
+.lp__input { display: flex; align-items: center; border: 1px solid #b5b5b5; border-radius: 10px; overflow: hidden; background: #fff; }
+.lp__input:focus-within { outline: 2px solid #005bd3; outline-offset: 1px; }
+.lp__input.has-error { border-color: #b42318; }
+.lp__input input { flex: 1; min-width: 0; border: 0; padding: 12px; font: inherit; font-size: 16px; outline: none; }
+.lp__input span { padding: 0 12px; color: #616161; background: #f6f6f6; align-self: stretch; display: flex; align-items: center; font-size: 14px; }
+.lp__error { color: #b42318; margin: 0; font-size: 14px; }
+.lp__btn { margin-top: 8px; min-height: 48px; border: 0; border-radius: 10px; background: #1f8f4e; color: #fff; font: inherit; font-weight: 700; font-size: 16px; cursor: pointer; }
+.lp__btn:hover { background: #17733e; }
+@media (max-width: 860px) {
+  .lp { grid-template-columns: 1fr; gap: 28px; padding: 28px 16px; }
+  .lp__features { grid-template-columns: 1fr; }
+}

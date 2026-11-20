@@ -1,0 +1,31 @@
+{%- comment -%} App block for product pages: "Ask on WhatsApp" with the product already in the message. {%- endcomment -%}
+{%- assign s = block.settings -%}
+{% render 'wa-config' %}
+<div class="wa-block" data-wa-block="product" {{ block.shopify_attributes }}>
+  <a href="#" class="wa-btn"
+    data-wa-widget="product"
+    data-phone="{{ s.phone | escape }}"
+    data-country-code="{{ s.country_code | escape }}"
+    data-message="{{ s.message | escape }}"
+    data-product="{{ product.title | escape }}"
+    rel="noopener" target="_blank">
+    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+  </a>
+</div>
+
+{% schema %}
+{
+  "name": "Ask on WhatsApp",
+  "target": "section",
+  "stylesheet": "wa-widget.css",
+  "javascript": "wa-widget.js",
+  "enabled_on": { "templates": ["product"] },
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button text", "default": "Ask about this product" },
+    { "type": "text", "id": "phone", "label": "WhatsApp number", "info": "With country code, e.g. 919876543210." },
+    { "type": "text", "id": "country_code", "label": "Default country code", "default": "91" },
+    { "type": "textarea", "id": "message", "label": "Pre-filled message", "default": "Hi! I'd like to know more about {product}: {url}", "info": "Use {product} and {url}." },
+    { "type": "paragraph", "content": "Colours, shape, size and which pages this shows on are set in the WA Assist app → Widgets → Buttons." }
+  ]
+}
+{% endschema %}

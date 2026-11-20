@@ -1,0 +1,222 @@
+/* WA Assist widgets. Everything is prefixed .wa- so themes are not affected. */
+.wa-chat, .wa-chat *, .wa-disc, .wa-disc *, .wa-block, .wa-block *, .wa-toast { box-sizing: border-box; }
+
+/* ===================== Chat button ===================== */
+.wa-chat {
+  --wa-bg: #1f8f4e; --wa-fg: #fff; --wa-header: #1f8f4e;
+  --wa-dx: 20px; --wa-dy: 20px; --wa-mx: 16px; --wa-my: 16px;
+  --wa-h: 52px; --wa-icon: 26px; --wa-font: 15px;
+  position: fixed;
+  bottom: calc(var(--wa-dy) + var(--wa-lift, 0px) + env(safe-area-inset-bottom, 0px));
+  z-index: 2147483000;
+  transition: bottom 0.2s ease;
+  font-family: inherit;
+  line-height: 1.4;
+}
+.wa-chat--sm { --wa-h: 44px; --wa-icon: 22px; --wa-font: 14px; }
+.wa-chat--lg { --wa-h: 62px; --wa-icon: 30px; --wa-font: 16px; }
+.wa-chat--d-right { right: var(--wa-dx); }
+.wa-chat--d-left { left: var(--wa-dx); }
+
+.wa-chat__bubble {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: var(--wa-h); min-width: var(--wa-h);
+  padding: 0 calc(var(--wa-h) * 0.36) 0 calc(var(--wa-h) * 0.28);
+  border: 0; border-radius: 999px;
+  background: var(--wa-bg); color: var(--wa-fg);
+  font: inherit; font-weight: 600; font-size: var(--wa-font);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.wa-chat__bubble:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22); }
+.wa-chat__bubble:focus-visible { outline: 3px solid #fff; outline-offset: 2px; box-shadow: 0 0 0 6px var(--wa-bg); }
+.wa-chat__bubble .wa-icon { width: var(--wa-icon); height: var(--wa-icon); flex: none; }
+.wa-chat--rounded .wa-chat__bubble { border-radius: calc(var(--wa-h) * 0.28); }
+.wa-chat--circle .wa-chat__bubble, .wa-chat--no-label .wa-chat__bubble { width: var(--wa-h); padding: 0; }
+.wa-chat--circle .wa-chat__label { display: none; }
+
+.wa-chat--pulse .wa-chat__bubble::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit;
+  box-shadow: 0 0 0 0 var(--wa-bg); animation: wa-pulse 2.2s ease-out infinite; pointer-events: none;
+}
+.wa-chat--pulse .wa-chat__bubble { position: relative; }
+
+.wa-chat__tooltip {
+  position: absolute; bottom: calc(100% + 10px);
+  display: flex; align-items: center; gap: 4px;
+  background: #fff; color: #1c1c1c; border-radius: 12px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  padding: 4px 4px 4px 12px; white-space: nowrap; max-width: calc(100vw - 32px);
+  animation: wa-pop 0.2s ease-out;
+}
+.wa-chat__tooltip[hidden] { display: none; }
+.wa-chat--d-right .wa-chat__tooltip { right: 0; }
+.wa-chat--d-left .wa-chat__tooltip { left: 0; }
+.wa-chat__tooltip-text { border: 0; background: none; font: inherit; font-size: 14px; color: inherit; cursor: pointer; padding: 6px 0; overflow: hidden; text-overflow: ellipsis; }
+.wa-chat__tooltip-x { border: 0; background: none; font-size: 18px; line-height: 1; color: #777; cursor: pointer; padding: 4px 8px; }
+
+.wa-chat__popup {
+  position: absolute; bottom: calc(100% + 12px);
+  width: min(330px, calc(100vw - 32px));
+  background: #fff; color: #1c1c1c; border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); overflow: hidden;
+  animation: wa-pop 0.16s ease-out;
+}
+.wa-chat__popup[hidden] { display: none; }
+.wa-chat--d-right .wa-chat__popup { right: 0; }
+.wa-chat--d-left .wa-chat__popup { left: 0; }
+.wa-chat__head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; background: var(--wa-header); color: #fff; }
+.wa-chat__title { font-size: 16px; }
+.wa-chat__close { border: 0; background: transparent; color: #fff; font-size: 24px; line-height: 1; cursor: pointer; padding: 0 4px; }
+.wa-chat__text { margin: 0; padding: 14px 16px 6px; font-size: 14px; color: #444; }
+.wa-chat__agents { list-style: none; margin: 0; padding: 6px 10px 12px; }
+.wa-chat__agent {
+  display: flex; width: 100%; align-items: center; gap: 10px;
+  padding: 10px 12px; margin-top: 6px;
+  border: 1px solid #e3e3e3; border-radius: 10px; background: #fafafa;
+  color: inherit; font: inherit; font-size: 15px; text-align: left; cursor: pointer;
+}
+.wa-chat__agent:hover:not(:disabled) { border-color: var(--wa-bg); background: #fff; }
+.wa-chat__agent:disabled { opacity: 0.55; cursor: not-allowed; }
+.wa-chat__avatar {
+  flex: none; width: 34px; height: 34px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--wa-bg); color: var(--wa-fg); font-weight: 700;
+}
+.wa-chat__agent-name { flex: 1; font-weight: 600; }
+.wa-chat__status { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: #666; }
+.wa-chat__status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #9e9e9e; }
+.wa-chat__status.is-online::before { background: #2ecc71; }
+
+@media (min-width: 750px) {
+  .wa-chat--d-hide { display: none; }
+}
+@media (max-width: 749px) {
+  .wa-chat { bottom: calc(var(--wa-my) + var(--wa-lift, 0px) + env(safe-area-inset-bottom, 0px)); left: auto; right: auto; }
+  .wa-chat--m-right { right: var(--wa-mx); }
+  .wa-chat--m-left { left: var(--wa-mx); }
+  .wa-chat--m-hide { display: none; }
+  .wa-chat--m-icon .wa-chat__label { display: none; }
+  .wa-chat--m-icon .wa-chat__bubble { width: var(--wa-h); padding: 0; }
+  .wa-chat--m-right .wa-chat__popup, .wa-chat--m-right .wa-chat__tooltip { right: 0; left: auto; }
+  .wa-chat--m-left .wa-chat__popup, .wa-chat--m-left .wa-chat__tooltip { left: 0; right: auto; }
+}
+
+/* ===================== Discount banner ===================== */
+.wa-disc {
+  --wa-dbg: #1c1c1c; --wa-dfg: #fff; --wa-dacc: #f5c542;
+  --wa-pad: 12px; --wa-head: 16px; --wa-sub: 14px;
+  font-family: inherit; line-height: 1.35; color: var(--wa-dfg);
+  z-index: 2147482999;
+}
+.wa-disc--sm { --wa-pad: 8px; --wa-head: 14px; --wa-sub: 13px; }
+.wa-disc--lg { --wa-pad: 18px; --wa-head: 19px; --wa-sub: 15px; }
+.wa-disc__box {
+  position: relative; display: flex; align-items: center; gap: 12px 18px; flex-wrap: wrap;
+  background: var(--wa-dbg); padding: var(--wa-pad) calc(var(--wa-pad) * 1.5);
+}
+.wa-disc__body { flex: 1 1 220px; min-width: 0; }
+.wa-disc__headline { margin: 0; font-weight: 700; font-size: var(--wa-head); }
+.wa-disc__sub { margin: 2px 0 0; font-size: var(--wa-sub); opacity: 0.9; }
+.wa-disc__code {
+  display: inline-block; padding: 1px 8px; border: 1.5px dashed var(--wa-dacc);
+  border-radius: 6px; color: var(--wa-dacc); letter-spacing: 0.04em;
+}
+.wa-disc__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.wa-disc__btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 38px; padding: 8px 14px; border-radius: 8px;
+  font: inherit; font-size: 14px; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.wa-disc__btn--apply { background: var(--wa-dacc); color: var(--wa-dbg); border: 2px solid var(--wa-dacc); }
+.wa-disc__btn--apply:hover { filter: brightness(1.06); }
+.wa-disc__btn--copy { background: transparent; color: var(--wa-dfg); border: 2px solid currentColor; opacity: 0.9; }
+.wa-disc__applied { font-weight: 700; color: var(--wa-dacc); }
+.wa-disc__x {
+  position: absolute; top: 4px; right: 6px;
+  border: 0; background: transparent; color: var(--wa-dfg); opacity: 0.75;
+  font-size: 22px; line-height: 1; cursor: pointer; padding: 4px 6px;
+}
+.wa-disc--pill .wa-disc__btn { border-radius: 999px; }
+.wa-disc--square .wa-disc__btn, .wa-disc--square .wa-disc__code { border-radius: 0; }
+
+/* bar layouts */
+.wa-disc--bar-top .wa-disc__box, .wa-disc--bar-bottom .wa-disc__box { justify-content: center; padding-right: 40px; }
+.wa-disc--bar-top .wa-disc__body, .wa-disc--bar-bottom .wa-disc__body { flex: 0 1 auto; text-align: center; }
+.wa-disc--bar-top { position: relative; }
+.wa-disc--bar-bottom { position: fixed; left: 0; right: 0; bottom: 0; padding-bottom: env(safe-area-inset-bottom, 0px); background: var(--wa-dbg); box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.12); }
+
+/* floating card (opposite side to the chat button) */
+.wa-disc--card { position: fixed; bottom: 20px; width: min(340px, calc(100vw - 32px)); }
+.wa-disc--card.wa-disc--left { left: 20px; }
+.wa-disc--card.wa-disc--right { right: 20px; }
+.wa-disc--card .wa-disc__box, .wa-disc--popup .wa-disc__box {
+  flex-direction: column; align-items: stretch; padding: calc(var(--wa-pad) * 1.6);
+  border-radius: 14px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  animation: wa-pop 0.2s ease-out;
+}
+.wa-disc--card .wa-disc__body, .wa-disc--popup .wa-disc__body { flex: none; padding-right: 20px; }
+.wa-disc--card .wa-disc__btn, .wa-disc--popup .wa-disc__btn { flex: 1; }
+.wa-disc--square .wa-disc__box { border-radius: 0; }
+.wa-disc--pill.wa-disc--card .wa-disc__box, .wa-disc--pill.wa-disc--popup .wa-disc__box { border-radius: 24px; }
+
+/* popup */
+.wa-disc--popup { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; }
+.wa-disc__overlay { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.5); animation: wa-fade 0.2s ease-out; }
+.wa-disc--popup .wa-disc__box { width: min(420px, 100%); text-align: center; }
+.wa-disc--popup .wa-disc__headline { font-size: calc(var(--wa-head) * 1.4); }
+.wa-disc--popup .wa-disc__body { padding: 8px 0 4px; }
+
+@media (max-width: 749px) {
+  .wa-disc--card { left: 0 !important; right: 0 !important; bottom: 0; width: 100%; }
+  .wa-disc--card .wa-disc__box { border-radius: 16px 16px 0 0; padding-bottom: calc(var(--wa-pad) * 1.6 + env(safe-area-inset-bottom, 0px)); }
+  .wa-disc--bar-top .wa-disc__box, .wa-disc--bar-bottom .wa-disc__box { padding: var(--wa-pad) 36px var(--wa-pad) 12px; gap: 8px; }
+  .wa-disc__btn { min-height: 34px; padding: 6px 12px; font-size: 13px; }
+}
+
+/* ===================== Inline buttons (product / cart / share) ===================== */
+.wa-block { margin: 12px 0; }
+.wa-block[hidden] { display: none; }
+.wa-btn {
+  --wa-color: #1f8f4e; --wa-on: #fff;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 46px; padding: 10px 18px;
+  border: 2px solid var(--wa-color); border-radius: 8px;
+  font: inherit; font-weight: 600; text-decoration: none; cursor: pointer;
+  transition: filter 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+.wa-btn .wa-icon { width: 20px; height: 20px; flex: none; }
+.wa-btn--solid { background: var(--wa-color); color: var(--wa-on); }
+.wa-btn--solid:hover { filter: brightness(0.92); }
+.wa-btn--outline { background: transparent; color: var(--wa-color); }
+.wa-btn--outline:hover { background: var(--wa-color); color: var(--wa-on); }
+.wa-btn--shape-square { border-radius: 0; }
+.wa-btn--shape-pill { border-radius: 999px; }
+.wa-btn--size-sm { min-height: 38px; padding: 6px 14px; font-size: 14px; }
+.wa-btn--size-lg { min-height: 54px; padding: 12px 24px; font-size: 17px; }
+.wa-btn--wide { width: 100%; }
+.wa-btn:focus-visible { outline: 3px solid var(--wa-color); outline-offset: 2px; }
+.wa-note { margin: 6px 0 0; font-size: 13px; opacity: 0.75; }
+@media (max-width: 749px) { .wa-block .wa-btn:not(.wa-btn--wide) { width: 100%; } }
+
+.wa-optin__label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; font-size: 15px; }
+.wa-optin__input { width: 18px; height: 18px; margin-top: 2px; accent-color: #1f8f4e; flex: none; }
+
+/* Preview toast (app editor only) */
+.wa-toast {
+  position: fixed; left: 50%; top: 16px; transform: translateX(-50%);
+  max-width: calc(100vw - 32px); background: #1c1c1c; color: #fff;
+  padding: 10px 14px; border-radius: 10px; font: 13px/1.4 system-ui, sans-serif;
+  z-index: 2147483647; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25); transition: opacity 0.3s;
+}
+.wa-toast.is-out { opacity: 0; }
+
+@keyframes wa-pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes wa-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes wa-pulse { 0% { box-shadow: 0 0 0 0 var(--wa-bg); opacity: 0.7; } 100% { box-shadow: 0 0 0 16px var(--wa-bg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .wa-chat__popup, .wa-chat__tooltip, .wa-disc__box, .wa-disc__overlay { animation: none; }
+  .wa-chat--pulse .wa-chat__bubble::after { animation: none; display: none; }
+  .wa-chat__bubble, .wa-btn { transition: none; }
+}

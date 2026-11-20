@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Widget harness – Blue Cotton Kurta</title>
+  <link rel="stylesheet" href="/assets/wa-widget.css">
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #f6f6f4; color: #222; }
+    header { background: #fff; padding: 18px 32px; border-bottom: 1px solid #e5e5e5; font-weight: 700; }
+    main { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; max-width: 980px; margin: 32px auto; padding: 0 24px; }
+    .img { aspect-ratio: 1; background: linear-gradient(135deg, #b8c9e8, #6d8fc9); border-radius: 12px; }
+    h1 { margin: 0 0 8px; font-size: 28px; } .price { font-size: 22px; margin-bottom: 16px; }
+    .atc { display: block; width: 100%; padding: 14px; background: #222; color: #fff; border: 0; border-radius: 8px; font-size: 16px; }
+    @media (max-width: 749px) { main { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header>Kurta House</header>
+  <main>
+    <div class="img"></div>
+    <div>
+      <h1>Blue Cotton Kurta</h1>
+      <div class="price">₹1,299</div>
+      <button class="atc">Add to cart</button>
+
+      <!-- Rendered output of blocks/product-button.liquid -->
+      <div class="wa-block" data-wa-block="product">
+        <a href="#" class="wa-btn" data-wa-widget="product"
+          data-phone="" data-country-code="91"
+          data-message="Hi! I'd like to know more about {product}: {url}"
+          data-product="Blue Cotton Kurta" rel="noopener" target="_blank">
+          <svg class="wa-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 2.5C6.5 2.5 2 6.4 2 11.2c0 2.4 1.1 4.6 3 6.2L4.2 21a.6.6 0 0 0 .9.6l4-2.1c.9.2 1.9.4 2.9.4 5.5 0 10-3.9 10-8.7S17.5 2.5 12 2.5z"/><circle cx="7.6" cy="11.2" r="1.4" fill="#fff"/><circle cx="12" cy="11.2" r="1.4" fill="#fff"/><circle cx="16.4" cy="11.2" r="1.4" fill="#fff"/></svg><span>Ask about this product</span>
+        </a>
+      </div>
+
+      <!-- blocks/share-button.liquid -->
+      <div class="wa-block" data-wa-block="share">
+        <a href="#" class="wa-btn" data-wa-widget="share"
+          data-message="Look what I found: {product} {url}" data-product="Blue Cotton Kurta" rel="noopener" target="_blank">
+          <svg class="wa-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 2.5C6.5 2.5 2 6.4 2 11.2c0 2.4 1.1 4.6 3 6.2L4.2 21a.6.6 0 0 0 .9.6l4-2.1c.9.2 1.9.4 2.9.4 5.5 0 10-3.9 10-8.7S17.5 2.5 12 2.5z"/></svg><span>Share on WhatsApp</span>
+        </a>
+      </div>
+
+      <!-- blocks/cart-order.liquid -->
+      <div class="wa-block" data-wa-block="cart">
+        <a href="#" class="wa-btn wa-btn--wide" data-wa-widget="cart"
+          data-phone="919876543210" data-country-code="91" data-intro="Hi! I'd like to order:"
+          data-outro="Please confirm availability and delivery." data-empty="Hi! I'd like help placing an order."
+          data-currency="INR" rel="noopener" target="_blank">
+          <svg class="wa-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path fill="currentColor" d="M12 2.5C6.5 2.5 2 6.4 2 11.2c0 2.4 1.1 4.6 3 6.2L4.2 21a.6.6 0 0 0 .9.6l4-2.1c.9.2 1.9.4 2.9.4 5.5 0 10-3.9 10-8.7S17.5 2.5 12 2.5z"/></svg><span>Order on WhatsApp</span>
+        </a>
+        <p class="wa-note">Prefer to chat? Send your cart to us on WhatsApp.</p>
+      </div>
+
+      <!-- blocks/optin.liquid -->
+      <div class="wa-block wa-optin">
+        <label class="wa-optin__label">
+          <input type="checkbox" class="wa-optin__input" data-wa-widget="optin">
+          <span>Send me order updates on WhatsApp</span>
+        </label>
+        <p class="wa-note">We'll only message you about this order. Reply STOP anytime.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Rendered output of snippets/wa-config.liquid (app embed) -->
+  <script type="application/json" data-wa-assist-config>__CONFIG__</script>
+  <script type="application/json" data-wa-assist-page>__PAGE__</script>
+
+  <script src="/assets/wa-widget.js" defer></script>
+</body>
+</html>

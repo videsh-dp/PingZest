@@ -1,0 +1,29 @@
+{%- comment -%}
+  App block for the cart page: WhatsApp opt-in checkbox.
+  Saves a cart attribute that Shopify copies onto the order ("WhatsApp updates: yes"),
+  which the app stores as the customer's consent record. Unchecked by default:
+  consent must be an active choice.
+{%- endcomment -%}
+{%- assign s = block.settings -%}
+{%- assign current = cart.attributes['WhatsApp updates'] -%}
+<div class="wa-block wa-optin" {{ block.shopify_attributes }}>
+  <label class="wa-optin__label">
+    <input type="checkbox" class="wa-optin__input" data-wa-widget="optin" {% if current == 'yes' %}checked{% endif %}>
+    <span>{{ s.label | escape }}</span>
+  </label>
+  {%- if s.help != blank -%}<p class="wa-note">{{ s.help | escape }}</p>{%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "WhatsApp updates opt-in",
+  "target": "section",
+  "stylesheet": "wa-widget.css",
+  "javascript": "wa-widget.js",
+  "enabled_on": { "templates": ["cart"] },
+  "settings": [
+    { "type": "text", "id": "label", "label": "Checkbox text", "default": "Send me order updates on WhatsApp" },
+    { "type": "text", "id": "help", "label": "Small print", "default": "We'll only message you about this order. Reply STOP anytime." }
+  ]
+}
+{% endschema %}

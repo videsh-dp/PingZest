@@ -1,0 +1,103 @@
+import { useLoaderData, useSearchParams } from "react-router";
+import { authenticate } from "../shopify.server";
+import { getSettings } from "../models/settings.server";
+import { listTemplates } from "../models/templates.server";
+import { cartQueue, markCheckoutSent, dismissCheckout, logSend } from "../models/orders.server";
+import { cartRowData, templatesFor, pickLang } from "../models/messages.server";
+import { formatMoney } from "../lib/orders.js";
+import { Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState, Banner, timeAgo, useQueueTemplate, TemplatePicker } from "../components/ui";
+
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
+  const filter = new URL(request.url).searchParams.get("filter") || "todo";
+  const [settings, templates] = await Promise.all([getSettings(shop), listTemplates(shop)]);
+  const rows = await cartQueue(shop, { delayMin: settings.abandonDelayMin, filter });
+  const lang = pickLang(request, settings);
+  return {
+    lang,
+    templates: templatesFor(templates, "abandoned_cart"),
+    delay: settings.abandonDelayMin,
+    rows: rows.map((c) => ({
+      id: c.id,
+      customerName: c.customerName,
+      amount: formatMoney(c.totalPrice, c.currency),
+      items: c.itemsSummary,
+      status: c.recovered ? "recovered" : c.status,
+      updatedAt: c.updatedAt,
+      sentAt: c.sentAt,
+      ...cartRowData(c, settings),
+    })),
+  };
+};
+
+export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const form = Object.fromEntries(await request.formData());
+  const id = Number(form.id);
+  if (form.intent === "sent") {
+    const templateId = form.templateId ? Number(form.templateId) : null;
+    await markCheckoutSent(session.shop, id, templateId);
+    await logSend(session.shop, { kind: "abandoned_cart", refId: id, templateId, templateName: form.templateName, lang: form.lang });
+  }
+  if (form.intent === "dismiss") await dismissCheckout(session.shop, id);
+  return { ok: true };
+};
+
+export default function Carts() {
+  const { rows, lang, delay, templates } = useLoaderData();
+  const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
+  const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
+  const [params] = useSearchParams();
+  const filter = params.get("filter") || "todo";
+  const tabs = [
+    { id: "todo", label: "To send" },
+    { id: "sent", label: "Sent" },
+    { id: "recovered", label: "Recovered" },
+  ];
+  return (
+    <Page
+      title="Abandoned checkouts"
+      subtitle={`Shoppers who entered a phone number but didn't finish checkout in the last 7 days (after ${delay} min).`}
+      actions={<div className="wa-row-gap"><TemplatePicker templates={forLang} chosen={chosen} /><LangSwitch lang={lang} /></div>}
+    >
+      <Banner tone="info">
+        Only message shoppers who agreed to be contacted. Cart reminders are marketing, so keep them to one per checkout.
+      </Banner>
+      <Tabs tabs={tabs} />
+      <Card>
+        {rows.length === 0 ? (
+          <EmptyState title={filter === "recovered" ? "No recovered checkouts yet" : "No abandoned checkouts right now"} />
+        ) : (
+          <table className="wa-table">
+            <thead><tr><th>Customer</th><th>Cart</th><th>Status</th><th className="wa-right">Actions</th></tr></thead>
+            <tbody>
+              {rows.map((row) => ({ ...row, ...compose(row) })).map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    {r.customerName || "—"}
+                    <div className="wa-muted">{r.phoneDisplay}</div>
+                    <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
+                  </td>
+                  <td>
+                    <strong>{r.amount}</strong>
+                    <div className="wa-muted">{r.items}</div>
+                    <div className="wa-muted">left {timeAgo(r.updatedAt)}</div>
+                  </td>
+                  <td><StatusBadge status={r.status} /></td>
+                  <td className="wa-right">
+                    <div className="wa-actions">
+                      {r.status === "pending" && <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} />}
+                      {r.status === "pending" && <ActionButton intent="dismiss" id={r.id}>Dismiss</ActionButton>}
+                      {r.status === "sent" && <span className="wa-muted">sent {timeAgo(r.sentAt)}</span>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Card>
+    </Page>
+  );
+}

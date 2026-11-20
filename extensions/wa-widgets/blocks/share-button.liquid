@@ -1,0 +1,32 @@
+{%- comment -%} App block: "Share on WhatsApp" for products or any page. {%- endcomment -%}
+{%- assign s = block.settings -%}
+{%- liquid
+  assign title = page_title
+  if product
+    assign title = product.title
+  endif
+-%}
+{% render 'wa-config' %}
+<div class="wa-block" data-wa-block="share" {{ block.shopify_attributes }}>
+  <a href="#" class="wa-btn"
+    data-wa-widget="share"
+    data-message="{{ s.message | escape }}"
+    data-product="{{ title | escape }}"
+    rel="noopener" target="_blank">
+    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+  </a>
+</div>
+
+{% schema %}
+{
+  "name": "Share on WhatsApp",
+  "target": "section",
+  "stylesheet": "wa-widget.css",
+  "javascript": "wa-widget.js",
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button text", "default": "Share on WhatsApp" },
+    { "type": "textarea", "id": "message", "label": "Message", "default": "Look what I found: {product} {url}", "info": "Use {product} and {url}." },
+    { "type": "paragraph", "content": "Colours, shape, size and which pages this shows on are set in the WA Assist app → Widgets → Buttons." }
+  ]
+}
+{% endschema %}

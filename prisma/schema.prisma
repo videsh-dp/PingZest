@@ -1,0 +1,182 @@
+// SQLite for development. For production switch provider to "postgresql"
+// and set DATABASE_URL (see README).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Shopify session storage (same shape as Shopify's app template)
+model Session {
+  id            String    @id
+  shop          String
+  state         String
+  isOnline      Boolean   @default(false)
+  scope         String?
+  expires       DateTime?
+  accessToken   String
+  userId        BigInt?
+  firstName     String?
+  lastName      String?
+  email         String?
+  accountOwner  Boolean   @default(false)
+  locale        String?
+  collaborator  Boolean?  @default(false)
+  emailVerified Boolean?  @default(false)
+}
+
+model ShopSettings {
+  shop             String   @id
+  storeName        String   @default("")
+  whatsappNumber   String   @default("") // store's own number, digits only
+  countryCode      String   @default("91")
+  defaultLang      String   @default("en") // en | hi
+  confirmedTag     String   @default("wa-cod-confirmed")
+  cancelledTag     String   @default("wa-cod-cancelled")
+  abandonDelayMin  Int      @default(30)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model MessageTemplate {
+  id        Int      @id @default(autoincrement())
+  shop      String
+  type      String // cod_confirm | abandoned_cart | shipped | delivered
+  lang      String // en | hi
+  name      String
+  body      String
+  isDefault Boolean  @default(false) // one default per shop + type + lang
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shop, type, lang])
+}
+
+// One row per message the merchant opened in WhatsApp (for message analytics).
+model MessageLog {
+  id           Int      @id @default(autoincrement())
+  shop         String
+  kind         String // cod_confirm | abandoned_cart | shipped | delivered
+  refId        Int // Order.id or Checkout.id
+  templateId   Int?
+  templateName String   @default("")
+  lang         String   @default("en")
+  day          String // YYYY-MM-DD
+  sentAt       DateTime @default(now())
+
+  @@index([shop, day])
+  @@index([shop, templateId])
+}
+
+model Order {
+  id                 Int       @id @default(autoincrement())
+  shop               String
+  shopifyOrderId     String
+  orderGid           String
+  orderName          String
+  customerName       String    @default("")
+  phone              String?
+  totalPrice         String
+  currency           String
+  itemsSummary       String    @default("")
+  isCod              Boolean   @default(false)
+  whatsappOptIn      Boolean   @default(false)
+  checkoutToken      String?
+  orderStatusUrl     String?
+  discountCodes      String    @default("") // comma-separated codes used on the order
+  discountAmount     String    @default("0")
+
+  // COD confirmation: pending | sent | confirmed | cancelled | no_reply
+  codStatus          String    @default("pending")
+  codSentAt          DateTime?
+  codRespondedAt     DateTime?
+  codRespondedBy     String? // customer | merchant
+  codTemplateId      Int?
+  confirmToken       String?   @unique
+  tokenExpiresAt     DateTime?
+
+  // Order updates
+  trackingUrl        String?
+  shippedAt          DateTime?
+  shippedMsgSentAt   DateTime?
+  deliveredAt        DateTime?
+  deliveredMsgSentAt DateTime?
+
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([shop, shopifyOrderId])
+  @@index([shop, isCod, codStatus])
+}
+
+model Checkout {
+  id           Int       @id @default(autoincrement())
+  shop         String
+  token        String
+  customerName String    @default("")
+  phone        String?
+  totalPrice   String
+  currency     String
+  itemsSummary String    @default("")
+  checkoutUrl  String?
+  completed    Boolean   @default(false)
+  recovered    Boolean   @default(false) // completed after we sent a reminder
+  status       String    @default("pending") // pending | sent | dismissed
+  sentAt       DateTime?
+  templateId   Int?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([shop, token])
+  @@index([shop, status])
+}
+
+// Daily widget counters (no shopper data stored).
+// widget: chat | discount | product | cart | share
+// event:  view | click | copy | apply
+model WidgetEvent {
+  id       Int    @id @default(autoincrement())
+  shop     String
+  widget   String
+  event    String
+  pageType String @default("other")
+  device   String @default("desktop") // desktop | mobile
+  day      String // YYYY-MM-DD
+  count    Int    @default(0)
+
+  @@unique([shop, widget, event, pageType, device, day])
+  @@index([shop, day])
+}
+
+// Widget design + page rules, edited in the app. Also copied to the
+// wa_assist.config shop metafield that the storefront reads.
+model WidgetConfig {
+  shop      String   @id
+  config    String // JSON (see app/lib/widget-config.js)
+  syncedAt  DateTime?
+  syncError String?
+  updatedAt DateTime @updatedAt
+}
+
+// Discount codes created from the app (they live in Shopify; this is our copy).
+model Discount {
+  id             Int       @id @default(autoincrement())
+  shop           String
+  shopifyGid     String?   // gid://shopify/DiscountCodeNode/...
+  code           String
+  title          String
+  kind           String    // percentage | fixed
+  value          Float     // 10 = 10% or 10 currency units
+  minSubtotal    Float?
+  oncePerCustomer Boolean  @default(true)
+  startsAt       DateTime  @default(now())
+  endsAt         DateTime?
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([shop, code])
+}

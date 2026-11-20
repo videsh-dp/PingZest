@@ -1,0 +1,14 @@
+{%- comment -%}
+  Widget settings saved by the app (app-owned metafield wa_assist.config) + page context.
+  Rendered by the app embed and by each app block; the script uses the first copy it finds.
+{%- endcomment -%}
+<script type="application/json" data-wa-assist-config>{{ app.metafields.wa_assist.config.value | json }}</script>
+<script type="application/json" data-wa-assist-page>
+  {
+    "pageType": {{ request.page_type | json }},
+    "product": {% if product %}{{ product.title | json }}{% else %}null{% endif %},
+    "shop": {{ shop.permanent_domain | json }},
+    "currency": {{ cart.currency.iso_code | json }},
+    "root": {{ routes.root_url | json }}
+  }
+</script>

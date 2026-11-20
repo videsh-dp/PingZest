@@ -1,0 +1,40 @@
+{%- comment -%}
+  App block for the cart page: "Order on WhatsApp".
+  Reads the live cart (/cart.js) when tapped and sends the item list and total to the store.
+{%- endcomment -%}
+{%- assign s = block.settings -%}
+{% render 'wa-config' %}
+<div class="wa-block" data-wa-block="cart" {{ block.shopify_attributes }}>
+  <a href="#" class="wa-btn wa-btn--wide"
+    data-wa-widget="cart"
+    data-phone="{{ s.phone | escape }}"
+    data-country-code="{{ s.country_code | escape }}"
+    data-intro="{{ s.intro | escape }}"
+    data-outro="{{ s.outro | escape }}"
+    data-empty="{{ s.empty_text | escape }}"
+    data-currency="{{ cart.currency.iso_code }}"
+    rel="noopener" target="_blank">
+    {% render 'wa-icon' %}<span>{{ s.label | escape }}</span>
+  </a>
+  {%- if s.note != blank -%}<p class="wa-note">{{ s.note | escape }}</p>{%- endif -%}
+</div>
+
+{% schema %}
+{
+  "name": "Order on WhatsApp",
+  "target": "section",
+  "stylesheet": "wa-widget.css",
+  "javascript": "wa-widget.js",
+  "enabled_on": { "templates": ["cart"] },
+  "settings": [
+    { "type": "text", "id": "label", "label": "Button text", "default": "Order on WhatsApp" },
+    { "type": "text", "id": "phone", "label": "WhatsApp number", "info": "With country code, e.g. 919876543210." },
+    { "type": "text", "id": "country_code", "label": "Default country code", "default": "91" },
+    { "type": "textarea", "id": "intro", "label": "Message start", "default": "Hi! I'd like to order:" },
+    { "type": "textarea", "id": "outro", "label": "Message end", "default": "Please confirm availability and delivery." },
+    { "type": "text", "id": "empty_text", "label": "Message if the cart is empty", "default": "Hi! I'd like help placing an order." },
+    { "type": "text", "id": "note", "label": "Small text under the button", "default": "Prefer to chat? Send your cart to us on WhatsApp." },
+    { "type": "paragraph", "content": "Colours, shape, size and which pages this shows on are set in the WA Assist app → Widgets → Buttons." }
+  ]
+}
+{% endschema %}
