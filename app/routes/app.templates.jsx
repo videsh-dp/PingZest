@@ -3,7 +3,7 @@ import { useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-r
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import {
-  listTemplates, createTemplate, updateTemplate, duplicateTemplate, setDefaultTemplate, deleteTemplate,
+  listTemplates, createTemplate, updateTemplate, duplicateTemplate, setDefaultTemplate, deleteTemplate, customTemplateAllowance,
 } from "../models/templates.server";
 import prisma from "../db.server";
 import { TEMPLATE_TYPES, LANGUAGES, VARIABLES, DEFAULT_TEMPLATES, STARTER_TEMPLATES, renderTemplate, validateTemplate } from "../lib/templates.js";
@@ -14,19 +14,22 @@ import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
 import { translateTexts, translationEnabled } from "../lib/translate.js";
 import { toId } from "../lib/ids.js";
+import { trackCall, flagOn } from "../posthog.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const [settings, templates, usage] = await Promise.all([
+  const [settings, templates, usage, allowance] = await Promise.all([
     getSettings(session.shop),
     listTemplates(session.shop),
     prisma.messageLog.groupBy({ by: ["templateId"], where: { shop: session.shop }, _count: { _all: true } }),
+    customTemplateAllowance(session.shop),
   ]);
   const sends = Object.fromEntries(usage.map((u) => [u.templateId, u._count._all]));
   return {
     storeName: settings.storeName || "Your Store",
-    canTranslate: translationEnabled(),
-    templates: templates.map((t) => ({ id: t.id, type: t.type, lang: t.lang, name: t.name, body: t.body, isDefault: t.isDefault, sends: sends[t.id] || 0 })),
+    canTranslate: translationEnabled() && (await flagOn(session.shop, "google-translate")),
+    allowance,
+    templates: templates.map((t) => ({ id: t.id, type: t.type, lang: t.lang, name: t.name, body: t.body, isDefault: t.isDefault, seeded: t.seeded, sends: sends[t.id] || 0 })),
   };
 };
 
@@ -45,7 +48,7 @@ export const action = async ({ request }) => {
     case "translate": {
       // Draft only: the text comes back into the editor, nothing is saved until the merchant presses Save.
       try {
-        const [text] = await translateTexts([String(form.body || "")], String(form.lang), String(form.from || "") || undefined);
+        const [text] = await trackCall("external_api_call", null, { service: "google_translate", target: String(form.lang), strings: 1 }, () => translateTexts([String(form.body || "")], String(form.lang), String(form.from || "") || undefined));
         return { translatedBody: text, translatedLang: String(form.lang) };
       } catch (e) {
         return { error: e.message };
@@ -72,7 +75,7 @@ const TOOLBAR = [
   ["number", "1.", N_("Numbered list (1. )"), (t, a, b) => prefixLines(t, a, b, "number")],
 ];
 
-function Editor({ template, type, lang, storeName, canTranslate, onDone }) {
+function Editor({ template, type, lang, storeName, canTranslate, canCreate, onDone }) {
   const tr = useT();
   const translator = useFetcher(); // per editor, so a draft never lands in another template
   const fetcher = useFetcher();
@@ -163,7 +166,7 @@ function Editor({ template, type, lang, storeName, canTranslate, onDone }) {
         )}
 
         {clientError && dirty && <p className="wa-warn">{tr(clientError)}</p>}
-        {result?.error && <p className="wa-error">{tr(result.error)}</p>}
+        {result?.error && <p className="wa-error">{tr(result.error, result.errorVars)}</p>}
         {translator.state === "idle" && translator.data?.error && <p className="wa-error">{translator.data.error}</p>}
         {translator.state === "idle" && translator.data?.translatedBody && <p className="wa-muted">{tr("Translated by Google. Check it, then save.")}</p>}
         {result?.warning && <p className="wa-warn">{tr(result.warning)}</p>}
@@ -179,7 +182,7 @@ function Editor({ template, type, lang, storeName, canTranslate, onDone }) {
           {!isNew && !template.isDefault && (
             <button type="button" className="wa-button wa-button--secondary" onClick={() => fetcher.submit({ intent: "default", id: String(template.id) }, { method: "post" })}>{tr("Make default")}</button>
           )}
-          {!isNew && <button type="button" className="wa-button wa-button--secondary" onClick={() => fetcher.submit({ intent: "duplicate", id: String(template.id) }, { method: "post" })}>{tr("Duplicate")}</button>}
+          {!isNew && canCreate && <button type="button" className="wa-button wa-button--secondary" onClick={() => fetcher.submit({ intent: "duplicate", id: String(template.id) }, { method: "post" })}>{tr("Duplicate")}</button>}
           {!isNew && (
             <button type="button" className="wa-button wa-button--critical"
               onClick={() => window.confirm(tr("Delete “{name}”?", { name: template.name })) && fetcher.submit({ intent: "delete", id: String(template.id) }, { method: "post" })}>{tr("Delete")}</button>
@@ -209,7 +212,7 @@ function Editor({ template, type, lang, storeName, canTranslate, onDone }) {
 
 export default function Templates() {
   const tr = useT();
-  const { templates, storeName, canTranslate } = useLoaderData();
+  const { templates, storeName, canTranslate, allowance } = useLoaderData();
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const type = TEMPLATE_TYPES[params.get("type")] ? params.get("type") : "cod_confirm";
@@ -234,7 +237,7 @@ export default function Templates() {
   }
 
   return (
-    <Page title={tr("Message templates")} subtitle={tr("Create as many messages as you like for each stage. Pick one in the queue when you send.")}>
+    <Page title={tr("Message templates")} subtitle={tr("Write your own messages for each stage, then pick one in the queue when you send.")}>
       <nav className="wa-tabs">
         {Object.entries(TEMPLATE_TYPES).map(([k, meta]) => (
           <button key={k} type="button" className={`wa-tab ${type === k ? "is-active" : ""}`} onClick={() => go({ type: k, id: null })}>
@@ -265,19 +268,28 @@ export default function Templates() {
               </li>
             ))}
           </ul>
-          <details className="wa-new">
-            <summary className="wa-button wa-button--secondary">{tr("+ New template")}</summary>
-            <div className="wa-new__menu">
-              <button type="button" onClick={() => go({ id: "new:blank" })}>{tr("Blank")}</button>
-              <button type="button" onClick={() => go({ id: "new:standard" })}>{tr("Copy of the standard message")}</button>
-              {starters.map(([n], i) => <button key={n} type="button" onClick={() => go({ id: `new:${i}` })}>{tr("Starter: {name}", { name: n })}</button>)}
-            </div>
-          </details>
+          {allowance.canCreate ? (
+            <details className="wa-new">
+              <summary className="wa-button wa-button--secondary">{tr("+ New template")}</summary>
+              <div className="wa-new__menu">
+                <button type="button" onClick={() => go({ id: "new:blank" })}>{tr("Blank")}</button>
+                <button type="button" onClick={() => go({ id: "new:standard" })}>{tr("Copy of the standard message")}</button>
+                {starters.map(([n], i) => <button key={n} type="button" onClick={() => go({ id: `new:${i}` })}>{tr("Starter: {name}", { name: n })}</button>)}
+              </div>
+            </details>
+          ) : (
+            <p className="wa-warn wa-small">{tr("You've used all {limit} custom templates on the Free plan. Delete one, or upgrade to PingZest Pro for unlimited templates.", { limit: allowance.limit })}</p>
+          )}
+          {allowance.limit != null && (
+            <p className="wa-muted wa-small">
+              {tr("Custom templates: {used} of {limit} on the Free plan. The Standard template for each stage and language is always included.", { used: allowance.used, limit: allowance.limit })}
+            </p>
+          )}
         </Card>
 
         <Card title={selected?.id ? tr("Edit “{name}”", { name: selected.name }) : tr("New template")}>
           {selected ? (
-            <Editor key={selected.id ?? idParam} template={selected} type={type} lang={lang} storeName={storeName} canTranslate={canTranslate}
+            <Editor key={selected.id ?? idParam} template={selected} type={type} lang={lang} storeName={storeName} canTranslate={canTranslate} canCreate={allowance.canCreate}
               onDone={(newId) => go({ id: newId ? String(newId) : null })} />
           ) : (
             <Banner tone="info">{tr("Pick a template on the left, or create a new one.")}</Banner>

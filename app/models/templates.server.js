@@ -6,6 +6,8 @@ import prisma from "../db.server";
 import { DEFAULT_TEMPLATES, TEMPLATE_TYPES, LANGUAGES, validateTemplate } from "../lib/templates.js";
 import { prefillWarning } from "../lib/whatsapp.js";
 import { N_ } from "../i18n/core.js";
+import { getSettings } from "./settings.server";
+import { templateAllowance, planOf } from "../lib/plans.js";
 
 export { validateTemplate };
 
@@ -18,7 +20,7 @@ export async function ensureTemplates(shop) {
   for (const type of Object.keys(TEMPLATE_TYPES)) {
     for (const lang of Object.keys(LANGUAGES)) {
       const body = DEFAULT_TEMPLATES[type][lang];
-      if (body && !seen.has(`${type}:${lang}`)) rows.push({ shop, type, lang, name: "Standard", body, isDefault: true });
+      if (body && !seen.has(`${type}:${lang}`)) rows.push({ shop, type, lang, name: "Standard", body, isDefault: true, seeded: true });
     }
   }
   if (rows.length) await prisma.messageTemplate.createMany({ data: rows });
@@ -36,7 +38,20 @@ async function makeDefault(shop, id, type, lang) {
   ]);
 }
 
+/** How many custom templates the shop has and may still create on its plan. */
+export async function customTemplateAllowance(shop) {
+  const [settings, used] = await Promise.all([
+    getSettings(shop),
+    prisma.messageTemplate.count({ where: { shop, seeded: false } }),
+  ]);
+  return templateAllowance(planOf(settings), used);
+}
+
+const LIMIT_ERROR = N_("The Free plan includes {limit} custom templates. Delete one or upgrade to create more.");
+
 export async function createTemplate(shop, input) {
+  const allowance = await customTemplateAllowance(shop);
+  if (!allowance.canCreate) return { error: LIMIT_ERROR, errorVars: { limit: allowance.limit }, limitReached: true };
   const data = { type: input.type, lang: input.lang, name: String(input.name || "").trim().slice(0, 60), body: String(input.body || "").trim() };
   const error = validateTemplate(data);
   if (error) return { error };
@@ -69,6 +84,8 @@ export async function updateTemplate(shop, id, input) {
 export async function duplicateTemplate(shop, id) {
   const t = await prisma.messageTemplate.findFirst({ where: { id, shop } });
   if (!t) return { error: N_("Template not found.") };
+  const allowance = await customTemplateAllowance(shop);
+  if (!allowance.canCreate) return { error: LIMIT_ERROR, errorVars: { limit: allowance.limit }, limitReached: true };
   const copy = await prisma.messageTemplate.create({
     data: { shop, type: t.type, lang: t.lang, name: `${t.name} (copy)`.slice(0, 60), body: t.body, isDefault: false },
   });

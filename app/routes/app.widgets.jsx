@@ -16,6 +16,8 @@ import { Page, Banner } from "../components/ui";
 import { Section, Row, Text, NumberField, Toggle, Choice, ColorField, PageRules, Agents } from "../components/fields";
 import widgetJs from "../../extensions/pingzest-widgets/assets/wa-widget.js?raw";
 import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
+import { trackCall, flagOn } from "../posthog.server";
+import { useFlag } from "../components/flags.jsx";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
@@ -37,7 +39,7 @@ export const loader = async ({ request }) => {
       : Object.entries(LOCALES).filter(([k]) => k !== "en").map(([code, l]) => ({ code, name: l.native, published: true })),
     knownLanguages: Boolean(shopLocales),
     mainLanguage: shopLocales?.find((l) => l.primary)?.locale || "en",
-    canTranslate: translationEnabled(),
+    canTranslate: translationEnabled() && (await flagOn(shop, "google-translate")),
     storeName: settings.storeName || "Your Store",
     discounts: discounts.filter((d) => d.active).map((d) => ({ code: d.code, label: `${d.code} · ${describeDiscount(d)}` })),
     links: {
@@ -58,7 +60,7 @@ export const action = async ({ request }) => {
     try { texts = JSON.parse(String(form.get("texts") || "{}")); } catch { /* empty */ }
     const paths = Object.keys(texts).filter((p) => p in TRANSLATABLE && texts[p]);
     try {
-      const out = await translateTexts(paths.map((p) => texts[p]), String(form.get("locale")), String(form.get("source") || "") || undefined);
+      const out = await trackCall("external_api_call", null, { service: "google_translate", target: String(form.get("locale")), strings: paths.length }, () => translateTexts(paths.map((p) => texts[p]), String(form.get("locale")), String(form.get("source") || "") || undefined));
       return { translated: Object.fromEntries(paths.map((p, i) => [p, out[i].slice(0, TRANSLATABLE[p])])), locale: String(form.get("locale")) };
     } catch (e) {
       return { translateError: e.message };
@@ -166,6 +168,7 @@ function LanguagesTab({ config, setConfig, languages, knownLanguages, canTransla
 
 export default function Widgets() {
   const tr = useT();
+  const showLanguages = useFlag("widget-languages-tab");
   const data = useLoaderData();
   const fetcher = useFetcher();
   const [config, setConfig] = useState(data.config);
@@ -236,7 +239,7 @@ export default function Widgets() {
       <div className="wa-editor-layout">
         <div className="wa-editor-panel">
           <nav className="wa-tabs wa-tabs--editor">
-            {TABS.map(([id, label]) => (
+            {TABS.filter(([id]) => id !== "languages" || showLanguages).map(([id, label]) => (
               <button key={id} type="button" className={`wa-tab ${tab === id ? "is-active" : ""}`} onClick={() => setTab(id)}>{tr(label)}</button>
             ))}
           </nav>

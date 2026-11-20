@@ -191,16 +191,30 @@ export async function redactCustomer(shop, { phone, orderIds = [] }) {
   if (phone) await prisma.checkout.deleteMany({ where: { shop, phone } });
 }
 
+/** Everything PingZest stores about one customer, for a data request (no internal ids or tokens). */
 export async function customerData(shop, { phone, orderIds = [] }) {
   const ids = orderIds.map(String);
   const orders = await prisma.order.findMany({
     where: { shop, OR: [{ shopifyOrderId: { in: ids } }, ...(phone ? [{ phone }] : [])] },
-    select: { orderName: true, customerName: true, phone: true, codStatus: true, whatsappOptIn: true, createdAt: true },
+    select: {
+      id: true, shopifyOrderId: true, orderName: true, customerName: true, phone: true, totalPrice: true, currency: true,
+      itemsSummary: true, isCod: true, codStatus: true, codSentAt: true, codRespondedAt: true, codRespondedBy: true,
+      whatsappOptIn: true, discountCodes: true, trackingUrl: true, shippedAt: true, deliveredAt: true,
+      shippedMsgSentAt: true, deliveredMsgSentAt: true, createdAt: true,
+    },
   });
   const checkouts = phone
-    ? await prisma.checkout.findMany({ where: { shop, phone }, select: { customerName: true, phone: true, status: true, createdAt: true } })
+    ? await prisma.checkout.findMany({
+        where: { shop, phone },
+        select: { id: true, customerName: true, phone: true, totalPrice: true, currency: true, itemsSummary: true, status: true, sentAt: true, recovered: true, createdAt: true },
+      })
     : [];
-  return { orders, checkouts };
+  const refIds = [...orders.map((o) => o.id), ...checkouts.map((c) => c.id)];
+  const messages = refIds.length
+    ? await prisma.messageLog.findMany({ where: { shop, refId: { in: refIds } }, select: { kind: true, templateName: true, lang: true, sentAt: true } })
+    : [];
+  const strip = ({ id, ...rest }) => rest;
+  return { orders: orders.map(strip), checkouts: checkouts.map(strip), messages };
 }
 
 export async function deleteShopData(shop) {
@@ -214,6 +228,8 @@ export async function deleteShopData(shop) {
     prisma.widgetConfig.deleteMany({ where: { shop } }),
     prisma.discount.deleteMany({ where: { shop } }),
     prisma.session.deleteMany({ where: { shop } }),
+    // Keep the privacy log itself (proof the request was handled) but drop any customer data in it.
+    prisma.complianceRequest.updateMany({ where: { shop }, data: { data: null } }),
   ]);
 }
 

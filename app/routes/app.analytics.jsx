@@ -8,6 +8,7 @@ import { Page, Card, Stat, Tabs, EmptyState } from "../components/ui";
 import { DailyChart } from "../components/DailyChart";
 import { useT } from "../i18n/react.jsx";
 import { N_ } from "../i18n/core.js";
+import { useFlag } from "../components/flags.jsx";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -19,6 +20,7 @@ export const loader = async ({ request }) => {
 
 function MessagesView({ m }) {
   const tr = useT();
+  const showTemplatePerformance = useFlag("template-performance");
   const fmtPct = tr.pct;
   if (!m.totalSent && !m.cod.sent && !m.carts.sent) {
     return (
@@ -70,6 +72,7 @@ function MessagesView({ m }) {
         </Card>
       </div>
 
+      {showTemplatePerformance && (
       <Card title={tr("Template performance")}>
         {m.templates.length === 0 ? <p className="wa-muted">{tr("No sends yet.")}</p> : (
           <table className="wa-table">
@@ -90,6 +93,7 @@ function MessagesView({ m }) {
         )}
         <p className="wa-muted">{tr("Try two templates for the same stage for a week each, then keep the one with the higher result.")} <Link to="/app/templates">{tr("Edit templates")}</Link></p>
       </Card>
+      )}
     </>
   );
 }

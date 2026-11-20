@@ -32,6 +32,8 @@ Work through this before you press "Submit for review".
 
 ## Before real merchants
 - [ ] MongoDB Atlas in production (replica set, backups on, IP access list set)
+- [ ] PostHog: `POSTHOG_API_KEY` set, alerts on `$exception` and `privacy_data_request`
+- [ ] Protected customer data form: list PostHog and MongoDB Atlas as processors (no customer data goes to PostHog)
 - [ ] Email the merchant on `customers/data_request` (currently only logged)
 - [ ] Error monitoring (e.g. Sentry) and uptime check on `/c/` pages
 - [ ] Back up the database daily

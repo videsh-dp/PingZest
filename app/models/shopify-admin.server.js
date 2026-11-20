@@ -1,10 +1,52 @@
+import { capture, captureException } from "../posthog.server";
+import { sanitize } from "../lib/telemetry.js";
+
+/**
+ * Every Shopify Admin API call goes through here so it shows up in PostHog as "shopify_api_call":
+ * operation name, duration, HTTP status, GraphQL errors, userErrors and query cost. Variables are
+ * logged with customer data and secrets removed.
+ */
+async function callAdmin(admin, query, options = {}) {
+  const operation = (String(query).match(/\b(query|mutation)\s+(\w+)/) || [])[2] || "anonymous";
+  const type = /\bmutation\b/.test(String(query).split("{")[0]) ? "mutation" : "query";
+  const started = Date.now();
+  const base = { operation, operation_type: type, variables: sanitize(options.variables || {}) };
+  let res;
+  try {
+    res = await admin.graphql(query, options);
+  } catch (e) {
+    capture("shopify_api_call", null, { ...base, ok: false, duration_ms: Date.now() - started, error: String(e?.message || e).slice(0, 500), status: e?.response?.code || e?.response?.status });
+    captureException(e, null, { source: "shopify_api_call", operation });
+    throw e;
+  }
+  try {
+    const body = await res.clone().json();
+    const errors = (body.errors || []).map((x) => x.message);
+    const userErrors = Object.values(body.data || {}).flatMap((v) => (v && Array.isArray(v.userErrors) ? v.userErrors.map((u) => u.message) : []));
+    capture("shopify_api_call", null, {
+      ...base,
+      ok: res.ok !== false && !errors.length,
+      status: res.status,
+      duration_ms: Date.now() - started,
+      graphql_errors: errors.length ? errors : undefined,
+      user_errors: userErrors.length ? userErrors : undefined,
+      cost: body.extensions?.cost?.actualQueryCost,
+      throttle_available: body.extensions?.cost?.throttleStatus?.currentlyAvailable,
+      response: sanitize(body.data),
+    });
+  } catch {
+    capture("shopify_api_call", null, { ...base, ok: res?.ok !== false, status: res?.status, duration_ms: Date.now() - started });
+  }
+  return res;
+}
+
 /**
  * Small wrappers around the Shopify Admin GraphQL API.
  * `admin` is the client from authenticate.admin / authenticate.webhook / unauthenticated.admin.
  */
 
 export async function tagOrder(admin, orderGid, tags) {
-  const res = await admin.graphql(
+  const res = await callAdmin(admin, 
     `#graphql
     mutation tagOrder($id: ID!, $tags: [String!]!) {
       tagsAdd(id: $id, tags: $tags) { userErrors { field message } }
@@ -18,7 +60,7 @@ export async function tagOrder(admin, orderGid, tags) {
 }
 
 export async function removeOrderTags(admin, orderGid, tags) {
-  const res = await admin.graphql(
+  const res = await callAdmin(admin, 
     `#graphql
     mutation untagOrder($id: ID!, $tags: [String!]!) {
       tagsRemove(id: $id, tags: $tags) { userErrors { field message } }
@@ -30,7 +72,7 @@ export async function removeOrderTags(admin, orderGid, tags) {
 }
 
 export async function fetchShopName(admin) {
-  const res = await admin.graphql(`#graphql
+  const res = await callAdmin(admin, `#graphql
     query shopName { shop { name } }`);
   const json = await res.json();
   return json.data?.shop?.name || "";
@@ -41,7 +83,7 @@ export async function fetchShopName(admin) {
  * When the phone is missing, fetch the order and shape it like a webhook payload.
  */
 export async function fetchOrderAsPayload(admin, orderGid) {
-  const res = await admin.graphql(
+  const res = await callAdmin(admin, 
     `#graphql
     query orderForWhatsApp($id: ID!) {
       order(id: $id) {
@@ -89,11 +131,11 @@ export const CONFIG_KEY = "config";
  * The theme app embed reads it as {{ app.metafields.pingzest.config.value }}.
  */
 export async function syncConfigMetafield(admin, config) {
-  const idRes = await admin.graphql(`#graphql
+  const idRes = await callAdmin(admin, `#graphql
     query appInstallation { currentAppInstallation { id } }`);
   const ownerId = (await idRes.json()).data?.currentAppInstallation?.id;
   if (!ownerId) throw new Error("Could not read app installation id");
-  const res = await admin.graphql(
+  const res = await callAdmin(admin, 
     `#graphql
     mutation saveWidgetConfig($metafields: [MetafieldsSetInput!]!) {
       metafieldsSet(metafields: $metafields) { userErrors { field message } }
@@ -130,7 +172,7 @@ function discountInput(d) {
 }
 
 async function gql(admin, query, variables) {
-  const res = await admin.graphql(query, { variables });
+  const res = await callAdmin(admin, query, { variables });
   const json = await res.json();
   if (json.errors?.length) throw new Error(json.errors.map((e) => e.message).join("; "));
   return json.data;

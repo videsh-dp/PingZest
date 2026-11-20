@@ -35,6 +35,7 @@ model ShopSettings {
   countryCode      String   @default("91")
   defaultLang      String   @default("en") // default message language (any app locale code)
   appLocale        String   @default("auto") // admin language: "auto" = follow Shopify admin
+  plan             String   @default("free") // free | pro (see app/lib/plans.js)
   confirmedTag     String   @default("wa-cod-confirmed")
   cancelledTag     String   @default("wa-cod-cancelled")
   abandonDelayMin  Int      @default(30)
@@ -50,6 +51,7 @@ model MessageTemplate {
   name      String
   body      String
   isDefault Boolean  @default(false) // one default per shop + type + lang
+  seeded    Boolean  @default(false) // built-in "Standard" template: doesn't count against plan limits
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -182,4 +184,26 @@ model Discount {
   updatedAt      DateTime  @updatedAt
 
   @@unique([shop, code])
+}
+
+// Shopify privacy webhooks, kept as a log. Data requests stay "pending" until the merchant has been
+// sent `data` (by hand for now; an email step can read this collection later).
+model ComplianceRequest {
+  id                String    @id @default(auto()) @map("_id") @db.ObjectId
+  shop              String
+  topic             String    // customers/data_request | customers/redact | shop/redact
+  webhookId         String?   // Shopify retries webhooks; used to store each one once
+  requestId         String?   // data_request.id from Shopify
+  shopifyCustomerId String?
+  ordersRequested   String[]
+  status            String    @default("done") // pending | done | redacted
+  data              Json?     // what PingZest holds about the customer (data requests only)
+  summary           String    @default("") // e.g. "3 orders, 1 checkout, 4 messages"
+  receivedAt        DateTime  @default(now())
+  handledAt         DateTime?
+  note              String    @default("")
+
+  @@index([status, receivedAt])
+  @@index([shop, topic])
+  @@index([webhookId])
 }

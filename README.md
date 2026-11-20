@@ -26,7 +26,7 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | Admin | Dashboard, setup checklist, one-click theme editor links | – |
 | Admin | **COD confirmation queue** → Send / Waiting / Confirmed / Cancelled / No reply | Level 2 customer data |
 | Admin | Abandoned checkout queue and order updates queue (shipped / delivered) | Level 2 customer data |
-| **Templates** | **Unlimited templates** per stage and language, one default each; formatting toolbar for what typed WhatsApp messages support (bold, italic, strikethrough, monospace, inline code, quote, lists), emoji, variables; phone-style preview rendered like WhatsApp; starter templates | – |
+| **Templates** | A built-in Standard template for every stage and language, plus **5 custom templates on the Free plan** (unlimited on Pro), one default per stage and language; formatting toolbar for what typed WhatsApp messages support (bold, italic, strikethrough, monospace, inline code, quote, lists), emoji, variables; phone-style preview rendered like WhatsApp; starter templates | – |
 | Queues | Template picker on each queue: switch templates and the messages update instantly | – |
 | **Message analytics** | Messages sent per day and by stage, COD confirm/cancel rate, median reply time, checkout recovery rate and sales, **template performance** | – |
 | Public | `/c/:token` confirm page: customer taps Confirm/Cancel → order tagged in Shopify | – |
@@ -90,6 +90,49 @@ Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.j
 `extensions/pingzest-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
 string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
 
+## Logging, errors and feature flags (PostHog)
+
+Set `POSTHOG_API_KEY` (Project settings → Project API key, `phc_…`) and `POSTHOG_HOST`
+(`https://us.i.posthog.com` or `https://eu.i.posthog.com`). Without a key nothing is sent and flags use their defaults.
+No npm package is needed: `app/lib/posthog-client.js` talks to PostHog's HTTP API directly.
+
+| Event | When | What's in it |
+|---|---|---|
+| `api_request` | Every request: admin pages, data loads, form posts, webhooks, storefront calls, confirm page | method, path, kind, shop, status, `level` (info/warning/error), duration, query + form params, JSON responses, redirect target, webhook topic/id, `request_id` |
+| `shopify_api_call` | Every Admin GraphQL call | operation, duration, status, GraphQL errors, `userErrors`, query cost, variables and response data |
+| `external_api_call` | Google Translate | service, target language, duration, ok/error |
+| `$exception` | Errors in loaders/actions/rendering, failed API calls, crashes, browser JavaScript errors | stack trace, path, shop, `request_id` (shows in PostHog **Error tracking**) |
+| `privacy_data_request` … | Privacy webhooks | request id and summary only |
+| `$pageview`, `$autocapture` | Browser, admin app only | pages and clicks (text masked) |
+
+- **Find a request:** Activity → filter `api_request` by `status ≥ 500`, `path`, or a shop. Filter any event by `request_id`
+  to see everything one request did.
+- **Never sent:** customer names, phones, emails, addresses, tokens, HMACs, cookies, confirm-link tokens, webhook
+  payloads. `app/lib/telemetry.js` removes them (tested). Session recording is off and clicked text is masked.
+- **Free plan volume (1M events/month):** an admin page view is 2–4 events. The storefront click counter runs on
+  every shopper page view, so successful storefront calls are sampled at 1% (`POSTHOG_STOREFRONT_SAMPLE=0.01`);
+  failures are always logged.
+- **Alerts:** in PostHog create an alert on `$exception` count, and on `privacy_data_request` (see below).
+
+**Feature flags:** defined in `app/lib/flags.js` with a default each. Create a flag with the same key in PostHog to
+roll it out to some stores (by shop domain, plan or %). Flags are read on the server per shop (cached 60 s), so pages
+render with the right features, and are available in components with `useFlag("key")` and in loaders with
+`flagOn(shop, "key")`. Current flags: `google-translate`, `widget-languages-tab`, `template-performance`.
+
+## Plans
+
+`app/lib/plans.js`. **Free:** 5 custom message templates; the built-in Standard template for every stage and language
+is always included and doesn't count. **Pro:** unlimited. Billing isn't built yet; to upgrade a store by hand set
+`plan: "pro"` on its `ShopSettings` document in MongoDB.
+
+## Privacy requests
+
+Shopify's three privacy webhooks are stored in the `ComplianceRequest` collection. A **data request** is saved as
+`status: "pending"` together with everything PingZest holds about that customer (`data`), and sends a
+`privacy_data_request` event to PostHog. Within 30 days, email `data` to the store owner, then set
+`status: "done"`. (`pendingDataRequests()` and `markDataRequestSent()` in `app/models/compliance.server.js` are
+ready for an automatic email later.) Redact requests delete the data and are logged as `done`.
+
 ## How login works
 
 - **Inside Shopify admin** (the normal case): Shopify signs the merchant in automatically with
@@ -137,10 +180,11 @@ Also check `ApiVersion` in `app/shopify.server.js` and `api_version` in `shopify
 ## Tests
 
 ```bash
-npm test                 # 75 unit tests: phone cleanup, templates (picking, validation), WhatsApp
+npm test                 # 87 unit tests: phone cleanup, templates (picking, validation), WhatsApp
                          # formatting, links, order parsing, tokens, widget settings, page rules,
                          # discount form, message analytics, store-address login input, languages
-                         # (every string translated, placeholders and plurals intact, Intl formatting)
+                         # (every string translated, placeholders and plurals intact, Intl formatting),
+                         # PostHog logging (redaction, batching, flags, request middleware), plan limits
 npm run test:widgets     # 19 browser checks of the storefront: designs, mobile, page rules, banner,
                          # copy/apply, tracking, shopper language and right-to-left (needs `npx playwright install chromium`)
 ```

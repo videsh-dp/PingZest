@@ -82,7 +82,7 @@ On development stores it works right away. Shopify reviews it when you submit to
 ## 6. Run the tests
 
 ```bash
-npm test                         # 75 unit tests (no Shopify needed)
+npm test                         # 87 unit tests (no Shopify needed)
 npx playwright install chromium  # once
 npm run test:widgets             # 19 browser checks of the storefront widgets
 ```
@@ -109,6 +109,8 @@ have Mumbai) if most of your merchants are in India.
    | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales` |
    | `DATABASE_URL` | Your MongoDB Atlas connection string, ending in `/pingzest?...` |
    | `NODE_ENV` | `production` |
+   | `POSTHOG_API_KEY` | Optional but recommended. PostHog → Project settings → Project API key (`phc_…`). Logs every request, error and API call, and powers feature flags |
+   | `POSTHOG_HOST` | `https://us.i.posthog.com` (or `https://eu.i.posthog.com` for an EU project) |
    | `GOOGLE_TRANSLATE_API_KEY` | Optional. Shows the "Auto-translate" / "Translate" buttons. Google Cloud → enable *Cloud Translation API* → Credentials → API key (restrict it to that API) |
 
 4. In `shopify.app.toml` set `application_url`, `redirect_urls` and `[app_proxy] url` to your server URL,
