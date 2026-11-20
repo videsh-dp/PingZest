@@ -186,7 +186,7 @@ test("confirm page: shows the order, records Confirm, 404 for unknown links, no 
   const post = await fetch(`${BASE}/c/${o.confirmToken}`, {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ choice: "confirm" }),
+    body: new URLSearchParams({ choice: "confirmed" }),
     redirect: "manual",
   });
   assert.ok(post.status < 500, `confirm returned ${post.status}`);
