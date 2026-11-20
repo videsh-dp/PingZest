@@ -1,6 +1,6 @@
 /*
- * WA Assist storefront widgets (v2).
- * Settings come from the app (metafield wa_assist.config, printed by snippets/wa-config.liquid).
+ * PingZest storefront widgets (v2).
+ * Settings come from the app (metafield pingzest.config, printed by snippets/wa-config.liquid).
  * Plain JS, no libraries, loaded with `defer`. Every widget only opens WhatsApp with a
  * message typed in; the shopper presses send.
  *
@@ -211,8 +211,8 @@
   function device() { return mobileQuery.matches ? "mobile" : "desktop"; }
 
   function loadContext() {
-    config = readJSON("script[data-wa-assist-config]") || null;
-    var p = readJSON("script[data-wa-assist-page]") || {};
+    config = readJSON("script[data-pingzest-config]") || null;
+    var p = readJSON("script[data-pingzest-page]") || {};
     var root = p.root || (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) || "/";
     var path = window.__WA_PREVIEW_PATH__ || window.location.pathname;
     if (root !== "/" && path.indexOf(root.replace(/\/$/, "")) === 0) path = path.slice(root.replace(/\/$/, "").length) || "/";
@@ -241,7 +241,7 @@
     if (PREVIEW || !config || config.tracking === false || !events.length) return;
     try {
       var payload = JSON.stringify({ pageType: page.pageType, device: device(), events: events });
-      var url = "/apps/wa-assist/track";
+      var url = "/apps/pingzest/track";
       if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([payload], { type: "text/plain" }));
       else fetch(url, { method: "POST", body: payload, keepalive: true, credentials: "omit" });
     } catch (e) { /* tracking must never break a widget */ }
@@ -515,12 +515,12 @@
 
     if (type === "product" || type === "share") {
       var text = fillMessage(el.getAttribute("data-message"), { product: el.getAttribute("data-product"), url: cleanUrl() });
-      if (type === "product" && !phone) return console.warn("[WA Assist] Add a WhatsApp number in the app or block settings.");
+      if (type === "product" && !phone) return console.warn("[PingZest] Add a WhatsApp number in the app or block settings.");
       track(type, "click");
       return openLink(waLink(type === "product" ? phone : null, text));
     }
 
-    if (!phone) return console.warn("[WA Assist] Add a WhatsApp number in the app or block settings.");
+    if (!phone) return console.warn("[PingZest] Add a WhatsApp number in the app or block settings.");
     track("cart", "click");
     var win = PREVIEW ? null : window.open("", "_blank");
     fetch(page.root + "cart.js", { headers: { Accept: "application/json" } })

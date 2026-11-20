@@ -22,11 +22,13 @@ Commands assume macOS or Linux; on Windows use WSL or Git Bash.
 ## 3. Get the code running
 
 ```bash
-git clone https://github.com/<you>/wa-assist.git
-cd wa-assist
+git clone https://github.com/videsh-dp/PingZest.git
+cd PingZest
 npm install
+cp .env.example .env     # local MongoDB connection string
+docker compose up -d     # starts MongoDB locally (needs Docker Desktop)
 npm run config:link      # log in to Shopify; choose "create a new app" and name it
-npm run setup            # creates the local SQLite database
+npm run setup            # creates the MongoDB collections and indexes
 npm run dev              # starts the app + a secure tunnel; prints an install link
 ```
 
@@ -35,6 +37,10 @@ Shopify's own sign-in, so there's no separate password. Anyone opening the app U
 landing page, types their store address and continues to Shopify.
 
 `npm run dev` keeps running. Leave the terminal open while you test.
+
+> **No Docker?** Create a free cluster on [MongoDB Atlas](https://www.mongodb.com/atlas), add your IP under
+> Network Access, and put its connection string (ending in `/pingzest`) in `.env` as `DATABASE_URL`.
+> A plain standalone `mongod` won't work: Prisma needs a replica set.
 
 > **If `npm install` fails** on a version, run
 > `shopify app init --template=https://github.com/Shopify/shopify-app-template-react-router`
@@ -62,7 +68,7 @@ On development stores it works right away. Shopify reviews it when you submit to
 |---|---|
 | Add your WhatsApp number | **Settings** |
 | Design the chat button and discount banner, set page rules, watch the live preview | **Widgets** |
-| Switch the widgets on in your theme (one time) | **Widgets** → "Turn on WA Assist in your theme" |
+| Switch the widgets on in your theme (one time) | **Widgets** → "Turn on PingZest in your theme" |
 | Add "Ask on WhatsApp", "Order on WhatsApp", "Share" buttons and the opt-in checkbox | **Widgets → Page buttons** → "Add to theme" |
 | Create a discount code and show it in the banner | **Discounts**, then **Widgets → Discount banner** |
 | Write several message templates with bold, lists, quotes… and preview them | **Message templates** |
@@ -83,12 +89,13 @@ npm run test:widgets             # 19 browser checks of the storefront widgets
 
 ## 7. Deploy to production
 
-The app needs an always-on Node server and a Postgres database. Render, Railway and Fly.io all work.
-Fly.io has a Mumbai region if most of your merchants are in India.
+The app needs an always-on Node.js server and a MongoDB database. Render, Railway and Fly.io all work
+for the server; use MongoDB Atlas for the database. Pick the same region for both (Atlas and Fly.io both
+have Mumbai) if most of your merchants are in India.
 
-1. **Database:** in `prisma/schema.prisma` set `provider = "postgresql"`. Locally run
-   `npx prisma migrate dev --name init` once and commit the `prisma/migrations` folder.
-   Then change the `setup` script in `package.json` to `prisma generate && prisma migrate deploy`.
+1. **Database:** create an Atlas cluster → Database Access (add a user) → Network Access (allow your host's
+   IPs, or 0.0.0.0/0 with a strong password) → Connect → copy the `mongodb+srv://…` string and add
+   `/pingzest` before the `?`. `npm run docker-start` runs `prisma db push` on boot to create indexes.
 2. **Create the service** from your GitHub repo:
    - Build command: `npm install && npm run build`
    - Start command: `npm run docker-start`
@@ -98,9 +105,9 @@ Fly.io has a Mumbai region if most of your merchants are in India.
    |---|---|
    | `SHOPIFY_API_KEY` | Client ID (Dev Dashboard → your app) |
    | `SHOPIFY_API_SECRET` | Client secret |
-   | `SHOPIFY_APP_URL` | Your server's public URL, e.g. `https://wa-assist.onrender.com` |
+   | `SHOPIFY_APP_URL` | Your server's public URL, e.g. `https://pingzest.onrender.com` |
    | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales` |
-   | `DATABASE_URL` | Your Postgres connection string |
+   | `DATABASE_URL` | Your MongoDB Atlas connection string, ending in `/pingzest?...` |
    | `NODE_ENV` | `production` |
    | `GOOGLE_TRANSLATE_API_KEY` | Optional. Shows the "Auto-translate" / "Translate" buttons. Google Cloud → enable *Cloud Translation API* → Credentials → API key (restrict it to that API) |
 
@@ -118,7 +125,7 @@ Work through [APP_STORE_CHECKLIST.md](APP_STORE_CHECKLIST.md). Use
 | Problem | Fix |
 |---|---|
 | Queues show "No phone" | Protected customer data isn't saved yet (step 4), or the order has no phone. Make phone required at checkout: Settings → Checkout. |
-| Widgets don't appear in the store | Turn on the **WA Assist widgets** app embed in the theme editor, and press **Save** in Widgets at least once. |
+| Widgets don't appear in the store | Turn on the **PingZest widgets** app embed in the theme editor, and press **Save** in Widgets at least once. |
 | "Saved in the app, but your store didn't update" | The metafield sync failed. Save again; check the terminal for the error. |
 | Confirm links stop working after restarting `npm run dev` | The dev tunnel URL changes on every restart. Production URLs don't. |
 | Discount "Apply" does nothing | The code must exist and be active in Shopify (Discounts page shows its status). |

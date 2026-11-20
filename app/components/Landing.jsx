@@ -26,7 +26,7 @@ function LandingInner({ errors = {}, defaultShop = "", signedOut = false }) {
   return (
     <main className="lp">
       <section className="lp__hero">
-        <p className="lp__brand"><span className="lp__logo" aria-hidden="true">●</span> {tr("WA Assist")}</p>
+        <p className="lp__brand"><span className="lp__logo" aria-hidden="true">●</span> {tr("PingZest")}</p>
         <h1 className="lp__title">{tr("WhatsApp tools for your Shopify store")}</h1>
         <p className="lp__lead">{tr("Chat button, COD confirmation, order updates and a discount banner. Free, with no Meta setup and no per-message fees.")}</p>
         <ul className="lp__features">

@@ -78,6 +78,12 @@ export async function codQueue(shop, filter = "todo") {
   });
 }
 
+/**
+ * MongoDB keeps "never set" and "null" apart, and Prisma leaves unset optional fields out of the
+ * document. This matches both, e.g. orders whose shipping message hasn't been sent yet.
+ */
+const empty = (field) => ({ OR: [{ [field]: null }, { [field]: { isSet: false } }] });
+
 export async function cartQueue(shop, { delayMin = 30, filter = "todo" } = {}) {
   const cutoff = new Date(Date.now() - delayMin * 60 * 1000);
   const base = { shop, completed: false, phone: { not: null } };
@@ -93,10 +99,10 @@ export async function cartQueue(shop, { delayMin = 30, filter = "todo" } = {}) {
 export async function updatesQueue(shop, filter = "shipped") {
   const where =
     filter === "delivered"
-      ? { shop, deliveredAt: { not: null }, deliveredMsgSentAt: null }
+      ? { shop, deliveredAt: { not: null }, AND: [empty("deliveredMsgSentAt")] }
       : filter === "done"
         ? { shop, OR: [{ shippedMsgSentAt: { not: null } }, { deliveredMsgSentAt: { not: null } }] }
-        : { shop, shippedAt: { not: null }, shippedMsgSentAt: null };
+        : { shop, shippedAt: { not: null }, AND: [empty("shippedMsgSentAt")] };
   return prisma.order.findMany({ where, orderBy: { updatedAt: "desc" }, take: 100 });
 }
 
@@ -135,13 +141,13 @@ export async function markUpdateSent(shop, id, kind) {
   return prisma.order.updateMany({ where: { id, shop }, data: { [field]: new Date() } });
 }
 export async function markDelivered(shop, id) {
-  return prisma.order.updateMany({ where: { id, shop, deliveredAt: null }, data: { deliveredAt: new Date() } });
+  return prisma.order.updateMany({ where: { id, shop, AND: [empty("deliveredAt")] }, data: { deliveredAt: new Date() } });
 }
 
 /* ---------- public confirm page ---------- */
 
 export async function findByToken(token) {
-  const order = await prisma.order.findUnique({ where: { confirmToken: token } });
+  const order = await prisma.order.findFirst({ where: { confirmToken: token } });
   if (!order) return null;
   if (order.tokenExpiresAt && order.tokenExpiresAt < new Date()) return { ...order, expired: true };
   return order;
@@ -162,8 +168,8 @@ export async function dashboardStats(shop) {
       where: {
         shop,
         OR: [
-          { shippedAt: { not: null }, shippedMsgSentAt: null },
-          { deliveredAt: { not: null }, deliveredMsgSentAt: null },
+          { shippedAt: { not: null }, AND: [empty("shippedMsgSentAt")] },
+          { deliveredAt: { not: null }, AND: [empty("deliveredMsgSentAt")] },
         ],
       },
     }),

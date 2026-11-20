@@ -9,6 +9,7 @@ import { formatMoney } from "../lib/orders.js";
 import { useT } from "../i18n/react.jsx";
 
 import prisma from "../db.server";
+import { toId } from "../lib/ids.js";
 import {
   Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState,
   useQueueTemplate, TemplatePicker,
@@ -53,10 +54,11 @@ export const action = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const form = Object.fromEntries(await request.formData());
-  const id = Number(form.id);
+  const id = toId(form.id);
+  if (!id) return { error: "Not found" };
 
   if (form.intent === "sent") {
-    const templateId = form.templateId ? Number(form.templateId) : null;
+    const templateId = toId(form.templateId);
     await markCodSent(shop, id, templateId);
     await logSend(shop, { kind: "cod_confirm", refId: id, templateId, templateName: form.templateName, lang: form.lang });
     return { ok: true };
@@ -139,7 +141,7 @@ export default function CodQueue() {
         )}
       </Card>
       <p className="wa-muted wa-footnote">
-        {tr("Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders. WA Assist doesn't cancel orders for you.")}
+        {tr("Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders. PingZest doesn't cancel orders for you.")}
       </p>
     </Page>
   );

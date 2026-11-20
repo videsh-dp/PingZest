@@ -35,11 +35,11 @@ function Account() {
   return (
     <Card title={tr("Account")}>
       <p>
-        Signed in with Shopify{app.staff ? <> as <strong>{app.staff}</strong></> : null} · <span className="wa-code">{app.shop}</span>
+        {app.staff ? tr("Signed in with Shopify as {name}", { name: app.staff }) : tr("Signed in with Shopify")} · <span className="wa-code">{app.shop}</span>
       </p>
-      <p className="wa-muted">{tr("WA Assist uses your Shopify login, so there's no separate password. Staff see the app if they have access to apps in Shopify.")}</p>
+      <p className="wa-muted">{tr("PingZest uses your Shopify login, so there's no separate password. Staff see the app if they have access to apps in Shopify.")}</p>
       <Form method="post" action="/app/logout">
-        <button type="submit" className="wa-button wa-button--secondary">{tr("Sign out of WA Assist")}</button>
+        <button type="submit" className="wa-button wa-button--secondary">{tr("Sign out of PingZest")}</button>
       </Form>
     </Card>
   );

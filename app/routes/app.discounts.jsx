@@ -6,6 +6,7 @@ import { getWidgetConfig } from "../models/widgets.server";
 import { Page, Card, Banner, EmptyState, ActionButton } from "../components/ui";
 import prisma from "../db.server";
 import { useT } from "../i18n/react.jsx";
+import { toId } from "../lib/ids.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -27,8 +28,10 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const form = Object.fromEntries(await request.formData());
-  const id = Number(form.id);
   if (form.intent === "create") return createDiscount(session.shop, admin, form);
+  const id = toId(form.id);
+  if (!id) return { error: "Not found" };
+
   if (form.intent === "activate") return toggleDiscount(session.shop, admin, id, true);
   if (form.intent === "deactivate") return toggleDiscount(session.shop, admin, id, false);
   if (form.intent === "delete") return removeDiscount(session.shop, admin, id);

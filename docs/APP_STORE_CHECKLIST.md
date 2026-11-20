@@ -31,7 +31,7 @@ Work through this before you press "Submit for review".
 - [ ] Test instructions for reviewers: how to place a COD order and see it in the queue
 
 ## Before real merchants
-- [ ] Postgres + migrations in production
+- [ ] MongoDB Atlas in production (replica set, backups on, IP access list set)
 - [ ] Email the merchant on `customers/data_request` (currently only logged)
 - [ ] Error monitoring (e.g. Sentry) and uptime check on `/c/` pages
 - [ ] Back up the database daily

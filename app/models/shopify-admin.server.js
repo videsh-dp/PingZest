@@ -81,12 +81,12 @@ export async function fetchOrderAsPayload(admin, orderGid) {
 
 /* ---------- widget config metafield ---------- */
 
-export const CONFIG_NAMESPACE = "wa_assist";
+export const CONFIG_NAMESPACE = "pingzest";
 export const CONFIG_KEY = "config";
 
 /**
  * Save widget settings to an app-owned metafield on the app installation.
- * The theme app embed reads it as {{ app.metafields.wa_assist.config.value }}.
+ * The theme app embed reads it as {{ app.metafields.pingzest.config.value }}.
  */
 export async function syncConfigMetafield(admin, config) {
   const idRes = await admin.graphql(`#graphql

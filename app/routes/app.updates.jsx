@@ -7,6 +7,7 @@ import { updateRowData, templatesFor, pickLang } from "../models/messages.server
 import { useT } from "../i18n/react.jsx";
 
 import { Page, Card, Tabs, LangSwitch, SendButton, ActionButton, MessagePreview, EmptyState, useQueueTemplate, TemplatePicker } from "../components/ui";
+import { toId } from "../lib/ids.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -37,9 +38,10 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const form = Object.fromEntries(await request.formData());
-  const id = Number(form.id);
+  const id = toId(form.id);
+  if (!id) return { error: "Not found" };
   if (form.intent === "sent") {
-    const templateId = form.templateId ? Number(form.templateId) : null;
+    const templateId = toId(form.templateId);
     await markUpdateSent(session.shop, id, form.kind);
     await logSend(session.shop, { kind: form.kind === "delivered" ? "delivered" : "shipped", refId: id, templateId, templateName: form.templateName, lang: form.lang });
   }

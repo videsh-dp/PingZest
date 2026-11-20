@@ -13,6 +13,7 @@ import { Page, Card, Banner, WaBubble } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
 import { translateTexts, translationEnabled } from "../lib/translate.js";
+import { toId } from "../lib/ids.js";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
@@ -33,7 +34,8 @@ export const action = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const form = Object.fromEntries(await request.formData());
-  const id = Number(form.id);
+  const id = toId(form.id);
+  if (["update", "duplicate", "default", "delete"].includes(form.intent) && !id) return { error: "Template not found." };
   switch (form.intent) {
     case "create": return createTemplate(shop, form);
     case "update": return updateTemplate(shop, id, form);

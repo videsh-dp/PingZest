@@ -1,9 +1,9 @@
 /**
  * Widget settings: one JSON document per shop, edited in the app and saved to an
- * app-owned shop metafield (wa_assist.config) that the theme app embed reads.
+ * app-owned shop metafield (pingzest.config) that the theme app embed reads.
  *
  * Pure module: used by the admin (editor + validation) and mirrored by the
- * storefront script (extensions/wa-widgets/assets/wa-widget.js).
+ * storefront script (extensions/pingzest-widgets/assets/wa-widget.js).
  */
 import { N_ } from "../i18n/core.js";
 

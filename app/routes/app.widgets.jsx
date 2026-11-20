@@ -14,8 +14,8 @@ import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
 import { Page, Banner } from "../components/ui";
 import { Section, Row, Text, NumberField, Toggle, Choice, ColorField, PageRules, Agents } from "../components/fields";
-import widgetJs from "../../extensions/wa-widgets/assets/wa-widget.js?raw";
-import widgetCss from "../../extensions/wa-widgets/assets/wa-widget.css?raw";
+import widgetJs from "../../extensions/pingzest-widgets/assets/wa-widget.js?raw";
+import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
@@ -230,7 +230,7 @@ export default function Widgets() {
         <Banner tone="critical">{tr("Saved in the app, but your store didn't update: {error}. Try saving again.", { error: result?.error || data.syncError })}</Banner>
       )}
       <Banner tone="info">
-        {tr("Widgets appear once the app embed is on.")} <a href={data.links.embed} target="_top">{tr("Turn on WA Assist in your theme")}</a> {tr("(one time)")}
+        {tr("Widgets appear once the app embed is on.")} <a href={data.links.embed} target="_top">{tr("Turn on PingZest in your theme")}</a> {tr("(one time)")}
       </Banner>
 
       <div className="wa-editor-layout">

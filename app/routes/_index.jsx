@@ -5,7 +5,7 @@ import { browserLocale, dictionaryFor } from "../i18n/server.js";
 
 export const links = () => [{ rel: "stylesheet", href: styles }];
 export const meta = () => [
-  { title: "WA Assist · WhatsApp tools for Shopify" },
+  { title: "PingZest · WhatsApp tools for Shopify" },
   { name: "description", content: "WhatsApp chat button, COD confirmation, order updates and discount banner for Shopify stores." },
 ];
 

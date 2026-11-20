@@ -46,14 +46,14 @@ export default function Index() {
   const steps = [
     { done: Boolean(settings.whatsappNumber), title: tr("Add your store's WhatsApp number"), text: tr("Used for reply links and as the default for widgets."), action: <Link className="wa-button wa-button--secondary" to="/app/settings">{tr("Open settings")}</Link> },
     { done: widgetsSaved, title: tr("Design your chat button"), text: tr("Pick colours, shape and placement, and choose which pages show it. Live preview included."), action: <Link className="wa-button wa-button--secondary" to="/app/widgets">{tr("Open Widgets")}</Link> },
-    { done: false, title: tr("Turn on WA Assist in your theme"), text: tr("One switch in the theme editor makes your widgets appear in your store."), action: <a className="wa-button wa-button--secondary" href={deepLinks.chat} target="_top">{tr("Turn on")}</a> },
+    { done: false, title: tr("Turn on PingZest in your theme"), text: tr("One switch in the theme editor makes your widgets appear in your store."), action: <a className="wa-button wa-button--secondary" href={deepLinks.chat} target="_top">{tr("Turn on")}</a> },
     { done: false, title: tr("Add “Ask on WhatsApp” to product pages"), text: tr("Shoppers message you with the product already in the chat."), action: <a className="wa-button wa-button--secondary" href={deepLinks.product} target="_top">{tr("Add block")}</a> },
     { done: false, title: tr("Add “Order on WhatsApp” and the opt-in checkbox to the cart"), text: tr("Takes orders from shoppers who prefer chat, and records WhatsApp consent."), action: <span className="wa-row-gap"><a className="wa-button wa-button--secondary" href={deepLinks.cart} target="_top">{tr("Order button")}</a><a className="wa-button wa-button--secondary" href={deepLinks.optin} target="_top">{tr("Opt-in")}</a></span> },
     { done: templatesSaved > 0, title: tr("Review your message templates"), text: tr("Defaults are ready in 7 languages. Adjust the tone to match your store."), action: <Link className="wa-button wa-button--secondary" to="/app/templates">{tr("Edit templates")}</Link> },
   ];
 
   return (
-    <Page title={app.staff ? tr("Welcome, {name}", { name: app.staff.split(" ")[0] }) : "WA Assist"} subtitle={`${tr("Free plan")} · ${settings.storeName || app.shop || ""}`}>
+    <Page title={app.staff ? tr("Welcome, {name}", { name: app.staff.split(" ")[0] }) : "PingZest"} subtitle={`${tr("Free plan")} · ${settings.storeName || app.shop || ""}`}>
       {stats.codTodo > 0 && (
         <Banner tone="attention">
           <strong>{tr.plural("{count} COD order needs confirmation.", "{count} COD orders need confirmation.", stats.codTodo)}</strong>{" "}
@@ -104,7 +104,7 @@ export default function Index() {
       </Card>
 
       <Card title={tr("How sending works")}>
-        <p>{tr("WA Assist prepares every message and opens WhatsApp with it typed in. You press send from your own WhatsApp or WhatsApp Business app, so there's no Meta setup and no per-message fees. COD messages include a confirm link: when the customer taps Confirm or Cancel, the order is tagged in Shopify automatically.")}</p>
+        <p>{tr("PingZest prepares every message and opens WhatsApp with it typed in. You press send from your own WhatsApp or WhatsApp Business app, so there's no Meta setup and no per-message fees. COD messages include a confirm link: when the customer taps Confirm or Cancel, the order is tagged in Shopify automatically.")}</p>
       </Card>
     </Page>
   );

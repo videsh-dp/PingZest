@@ -2,7 +2,7 @@ import { authenticate } from "../shopify.server";
 import { recordEvents } from "../models/widgets.server";
 
 /**
- * App proxy endpoint: storefront widgets POST here via https://{shop}/apps/wa-assist/track.
+ * App proxy endpoint: storefront widgets POST here via https://{shop}/apps/pingzest/track.
  * Shopify signs the request, so we know which shop it came from.
  * Body: { pageType, device, events: [{ widget, event }] }. Only daily counters are stored.
  */

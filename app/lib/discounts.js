@@ -18,7 +18,7 @@ export function parseDiscountForm(form, now = new Date()) {
     if (Number.isNaN(endsAt.getTime()) || endsAt <= now) errors.endsAt = N_("Pick a date in the future, or leave empty.");
   }
   if (Object.keys(errors).length) return { errors };
-  const title = String(form.title || "").trim().slice(0, 80) || `${code} (WA Assist banner)`;
+  const title = String(form.title || "").trim().slice(0, 80) || `${code} (PingZest banner)`;
   return {
     data: {
       code, title, kind, value, minSubtotal, endsAt,

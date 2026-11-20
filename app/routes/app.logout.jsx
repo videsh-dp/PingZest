@@ -2,7 +2,7 @@ import { redirect } from "react-router";
 import { authenticate, sessionStorage } from "../shopify.server";
 
 /**
- * "Sign out of WA Assist": removes this staff member's online session.
+ * "Sign out of PingZest": removes this staff member's online session.
  * The store's offline token stays, so webhooks and confirm links keep working.
  * Opening the app again from Shopify admin signs them back in automatically.
  */

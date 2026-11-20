@@ -11,7 +11,7 @@ test("valid percentage discount", () => {
   assert.equal(r.data.value, 10);
   assert.equal(r.data.minSubtotal, 999);
   assert.equal(r.data.oncePerCustomer, true);
-  assert.equal(r.data.title, "WELCOME10 (WA Assist banner)");
+  assert.equal(r.data.title, "WELCOME10 (PingZest banner)");
   assert.equal(r.data.endsAt.getFullYear(), 2026);
 });
 

@@ -3,6 +3,5 @@ build
 .env
 .env.*
 !.env.example
-prisma/*.sqlite*
 .shopify
 test/widgets/*.png

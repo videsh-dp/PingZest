@@ -60,8 +60,8 @@ ${css}
 </style></head><body>
 <header class="pv-head">${esc(storeName)}<span>Preview · ${esc(p.title)}</span></header>
 <main>${p.body}</main>
-<script type="application/json" data-wa-assist-config>${safeJson(config)}</script>
-<script type="application/json" data-wa-assist-page>${safeJson(pageCtx)}</script>
+<script type="application/json" data-pingzest-config>${safeJson(config)}</script>
+<script type="application/json" data-pingzest-page>${safeJson(pageCtx)}</script>
 <script>window.__WA_PREVIEW__=true;window.__WA_PREVIEW_PATH__=${safeJson(p.path)};</script>
 <script>${js.replace(/<\/script/gi, "<\\/script")}</script>
 </body></html>`;

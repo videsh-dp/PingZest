@@ -1,4 +1,4 @@
-# WA Assist: free plan
+# PingZest: free plan
 
 WhatsApp widgets, COD confirmation, abandoned checkout reminders and order updates for Shopify.
 **Manual send:** the app prepares every message and opens WhatsApp with it typed in; the merchant
@@ -48,9 +48,9 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 
 1. The merchant edits widgets in **Widgets** and presses Save.
 2. The app validates the settings (`app/lib/widget-config.js`), stores them, and writes them to an
-   **app-owned metafield** (`wa_assist.config`) with `metafieldsSet`.
+   **app-owned metafield** (`pingzest.config`) with `metafieldsSet`.
 3. The theme app embed (`blocks/app-embed.liquid`, one switch in the theme editor) prints that JSON with
-   `{{ app.metafields.wa_assist.config.value | json }}` plus the page type, so the storefront script needs
+   `{{ app.metafields.pingzest.config.value | json }}` plus the page type, so the storefront script needs
    no network request to load settings.
 4. `assets/wa-widget.js` builds the chat button and banner, applies page rules, styles the page buttons,
    and sends **one** analytics request per page for views (plus one per click) to the app proxy.
@@ -73,7 +73,7 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 - **Which language:** Settings → App language. "Same as my Shopify admin" uses the `locale` Shopify sends
   when the app opens, then the browser language.
 - **Storefront:** the theme passes `request.locale` to the widget. Built-in labels and default texts are
-  translated in `wa-widget.js` and `extensions/wa-widgets/locales/*.json`; anything the merchant wrote stays as
+  translated in `wa-widget.js` and `extensions/pingzest-widgets/locales/*.json`; anything the merchant wrote stays as
   written unless they add a translation under Widgets → Languages.
 - **Google Translate is optional and only runs when a merchant clicks a translate button.** Set
   `GOOGLE_TRANSLATE_API_KEY` (Google Cloud → APIs → Cloud Translation API → Credentials) to show the buttons.
@@ -87,7 +87,7 @@ GOOGLE_TRANSLATE_API_KEY=... node scripts/translate-locale.mjs ja   # drafts app
 
 Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.js`, add confirm-page texts in
 `app/i18n/confirm.js`, default templates in `app/lib/templates.js`, and storefront texts in `wa-widget.js` and
-`extensions/wa-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
+`extensions/pingzest-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
 string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
 
 ## How login works
@@ -102,18 +102,23 @@ string is translated (`node scripts/extract-i18n.mjs --check` lists what's missi
 
 ## Run it locally
 
-Requirements: Node 20.19+, a [Shopify Partner account](https://partners.shopify.com), and a development store.
+Stack: **Node.js** (React Router, Shopify's app template) + **MongoDB** through Prisma.
+
+Requirements: Node 20.19+, MongoDB (Docker for local, or a free MongoDB Atlas cluster),
+a [Shopify Partner account](https://partners.shopify.com), and a development store.
 
 ```bash
 npm install
+cp .env.example .env     # DATABASE_URL points at the local MongoDB below
+docker compose up -d     # local MongoDB (one-node replica set, which Prisma needs)
 npm run config:link      # links shopify.app.toml to your app in the Partner Dashboard
-npm run setup            # prisma generate + create the SQLite database
+npm run setup            # prisma generate + prisma db push (creates collections and indexes)
 npm run dev              # shopify app dev: tunnel, install on your dev store, live reload
 ```
 
 Then, in your dev store:
 1. Open the app → **Settings** → add your WhatsApp number.
-2. **Widgets** → add your number, design the chat button, Save. Then click **Turn on WA Assist in your theme** (one switch).
+2. **Widgets** → add your number, design the chat button, Save. Then click **Turn on PingZest in your theme** (one switch).
 3. Place a test order with the **Cash on Delivery** payment method (Settings → Payments → Manual payment methods).
 4. Open **COD confirmation** and send it to your own phone.
 
@@ -151,16 +156,19 @@ app/routes/         app.* = admin pages (widgets, discounts, analytics, cod, car
                     webhooks.* · proxy.track · c.$token (public confirm page)
 app/components/     ui.jsx (admin UI kit, WhatsApp bubble, template picker) · fields.jsx (editor controls)
                     DailyChart.jsx (SVG chart) · Landing.jsx (login page)
-extensions/wa-widgets/ Theme app extension: app embed (chat + banner) + product/cart/share/opt-in blocks
-prisma/schema.prisma   Sessions, settings, templates, orders, checkouts, widget click counters
+extensions/pingzest-widgets/ Theme app extension: app embed (chat + banner) + product/cart/share/opt-in blocks
+prisma/schema.prisma   MongoDB collections: sessions, settings, templates, orders, checkouts, widget counters
+docker-compose.yml     Local MongoDB (one-node replica set)
 scripts/            extract-i18n.mjs (list/check UI strings) · translate-locale.mjs (Google draft of a new language)
 docs/               SETUP.md, App Store checklist, privacy policy template, screenshots
 ```
 
 ## Going to production
 
-- **Database:** switch `provider` to `postgresql` in `prisma/schema.prisma`, set `DATABASE_URL`, and run
-  `npx prisma migrate dev --name init` once to create migrations. Then use `prisma migrate deploy` in the `setup` script instead of `db push`.
+- **Database:** create a MongoDB Atlas cluster (the free M0 tier is fine to start; Atlas is always a replica set).
+  Set `DATABASE_URL` to its connection string **with the database name**, e.g.
+  `mongodb+srv://user:pass@cluster0.xxxx.mongodb.net/pingzest?retryWrites=true&w=majority`.
+  `npm run setup` runs `prisma db push`, which creates the collections and indexes (MongoDB has no migrations).
 - **Hosting:** any Node host (Render, Railway, Fly.io). Set `SHOPIFY_API_KEY`, `SHOPIFY_API_SECRET`,
   `SHOPIFY_APP_URL`, `SCOPES`, `DATABASE_URL` (and optionally `GOOGLE_TRANSLATE_API_KEY`), then run `npm run build && npm run docker-start`.
 - **Deploy config and the theme extension:** `npm run deploy`.

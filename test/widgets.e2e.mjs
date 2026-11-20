@@ -10,7 +10,7 @@ import assert from "node:assert/strict";
 import { defaultConfig } from "../app/lib/widget-config.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const ext = path.join(here, "..", "extensions", "wa-widgets", "assets");
+const ext = path.join(here, "..", "extensions", "pingzest-widgets", "assets");
 const shotDir = path.join(here, "widgets");
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || "playwright");
 
@@ -36,7 +36,7 @@ const server = http.createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
   req.on("end", () => {
-    if (url.pathname === "/apps/wa-assist/track") { beacons.push(JSON.parse(body)); res.writeHead(204); return res.end(); }
+    if (url.pathname === "/apps/pingzest/track") { beacons.push(JSON.parse(body)); res.writeHead(204); return res.end(); }
     if (url.pathname === "/cart/update.js") { cartUpdates.push(JSON.parse(body)); res.writeHead(200); return res.end("{}"); }
     const sc = scenarios.get(url.searchParams.get("s")) || {};
     const html = fs.readFileSync(path.join(here, "widgets", "harness.html"), "utf8")

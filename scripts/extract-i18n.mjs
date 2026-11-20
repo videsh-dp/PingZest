@@ -9,7 +9,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Brand names, codes and example values that stay the same in every language. */
-export const KEEP_ENGLISH = new Set([".myshopify.com", "WA Assist", "WELCOME10", "your-store"]);
+export const KEEP_ENGLISH = new Set([".myshopify.com", "PingZest", "WELCOME10", "your-store"]);
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const STR = String.raw`"((?:[^"\\]|\\.)*)"`;
