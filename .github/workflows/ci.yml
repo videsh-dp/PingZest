@@ -64,6 +64,14 @@ jobs:
       - name: Integration tests (real server + MongoDB, signed webhooks, fake PostHog)
         run: npm run test:integration
 
+      - name: Test-data script (npm run test:webhooks) against the production server
+        run: |
+          PORT=3000 npx react-router-serve ./build/server/index.js > /tmp/pingzest-server.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS localhost:3000/healthz >/dev/null && break; sleep 1; done
+          SHOP=ci-seed.myshopify.com npm run test:webhooks -- --privacy | tee /tmp/seed.log
+          grep -q "Confirm pages" /tmp/seed.log
+          kill %1 || true
+
       - name: Install Playwright + Chromium
         run: |
           npm install --no-save --no-audit --no-fund playwright@1

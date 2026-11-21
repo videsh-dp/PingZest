@@ -25,6 +25,7 @@ const SHOP = process.env.SHOP || (readFileSync("shopify.app.toml", "utf8").match
 if (!SECRET) { console.error("Set SHOPIFY_API_SECRET (the app's Client secret) in .env"); process.exit(1); }
 if (!SHOP) { console.error("Set SHOP=your-store.myshopify.com in .env"); process.exit(1); }
 
+let failed = 0;
 async function send(path, topic, payload) {
   const body = JSON.stringify(payload);
   const res = await fetch(`${BASE}${path}`, {
@@ -43,7 +44,7 @@ async function send(path, topic, payload) {
     body,
   });
   console.log(`${res.ok ? "✓" : "✗"} ${topic.padEnd(24)} ${res.status}  ${payload.name || payload.token || ""}`);
-  if (!res.ok) console.log("   ", (await res.text()).slice(0, 300));
+  if (!res.ok) { failed++; console.log("   ", (await res.text()).slice(0, 300)); }
   return res.ok;
 }
 
@@ -110,4 +111,5 @@ if (process.env.DATABASE_URL) {
     console.log(`\n(Couldn't reach the database to back-date checkouts: ${e.message})`);
   }
 }
+if (failed) { console.error(`\n${failed} webhook(s) failed. Is the app running at ${BASE}, and is SHOPIFY_API_SECRET the app's Client secret?`); process.exit(1); }
 console.log("\nOpen the app in your dev store: COD confirmation, Abandoned checkouts and Order updates now have test rows.");
