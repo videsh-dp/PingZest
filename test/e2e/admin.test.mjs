@@ -52,7 +52,10 @@ test("opening the app authenticates with the session token (token exchange) and 
 test("a request without a valid session token doesn't get in", async () => {
   const r = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=not.a.jwt`, { redirect: "manual", headers: { "User-Agent": UA } });
   assert.notEqual(r.status, 200);
-  const forged = sessionToken().replace(/.$/, (c) => (c === "A" ? "B" : "A"));
+  // Tampered token: another staff member's id, same signature.
+  const [h, , sig] = sessionToken().split(".");
+  const body = Buffer.from(JSON.stringify({ iss: `https://${SHOP}/admin`, dest: `https://${SHOP}`, aud: "ci-api-key", sub: "999", exp: Math.floor(Date.now() / 1000) + 60, nbf: 0, iat: 0, jti: "x", sid: "x" })).toString("base64url");
+  const forged = `${h}.${body}.${sig}`;
   const r2 = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=${forged}`, { redirect: "manual", headers: { "User-Agent": UA } });
   assert.notEqual(r2.status, 200);
 });
