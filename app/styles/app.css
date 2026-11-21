@@ -458,3 +458,7 @@ a.wa-chip { text-decoration: none; color: inherit; }
   .wa-list__table td.wa-list__actions { padding-top: 8px !important; }
   .wa-list__table td.wa-list__actions .wa-actions { flex-wrap: wrap; }
 }
+
+/* Shopify's admin menu (App Bridge <ui-nav-menu>) is read by App Bridge, never shown in the page.
+   Without this it renders as a row of plain links before App Bridge loads, or outside Shopify admin. */
+ui-nav-menu { display: none !important; }
