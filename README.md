@@ -93,6 +93,11 @@ Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.j
 `extensions/pingzest-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
 string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
 
+## Local development
+
+Run it on your laptop with ngrok and fill it with test data: see **[docs/LOCAL_DEV.md](docs/LOCAL_DEV.md)**
+(`npm run dev:ngrok`, `npm run test:webhooks`). Work on the `dev` branch; `main` deploys.
+
 ## Deploying
 
 Own server with nginx + PM2 (about ₹530/month): see **[docs/DEPLOY.md](docs/DEPLOY.md)**. One setup script for a fresh

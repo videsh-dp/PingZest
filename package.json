@@ -5,6 +5,8 @@
   "description": "WhatsApp widgets, COD confirmation and order messages for Shopify: free plan, manual send (no Meta API).",
   "scripts": {
     "dev": "shopify app dev",
+    "dev:ngrok": "node scripts/dev-ngrok.mjs",
+    "test:webhooks": "node scripts/send-test-webhooks.mjs",
     "build": "react-router build",
     "start": "react-router-serve ./build/server/index.js",
     "setup": "prisma generate && prisma db push",
