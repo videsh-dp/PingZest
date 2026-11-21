@@ -29,6 +29,9 @@ model Session {
   locale        String?
   collaborator  Boolean?  @default(false)
   emailVerified Boolean?  @default(false)
+  // Expiring offline tokens (Shopify no longer accepts non-expiring ones): refreshed with this token.
+  refreshToken        String?
+  refreshTokenExpires DateTime?
 }
 
 model ShopSettings {
