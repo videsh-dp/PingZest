@@ -75,6 +75,9 @@ jobs:
           node scripts/fetch-admin-schema.mjs /tmp/e2e/admin-schema.json
           E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e
 
+      - name: "End-to-end again on the Vite dev server (what shopify app dev runs locally)"
+        run: E2E_SERVER=dev E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e
+
       - name: E2E server log (on failure)
         if: failure()
         run: tail -300 /tmp/pingzest-e2e-server.log 2>/dev/null || true

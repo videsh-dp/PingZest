@@ -68,11 +68,14 @@ export async function startApp({ port, log = `/tmp/pingzest-e2e-${port}.log` }) 
   // The offline session Shopify creates at install (used by webhooks and the confirm page).
   await prisma.session.create({ data: { id: `offline_${SHOP}`, shop: SHOP, state: "installed", isOnline: false, scope: SCOPES, accessToken: "shpat_fake_offline" } });
 
-  const server = spawn("npx", ["react-router-serve", "./build/server/index.js"], {
-    env: { ...process.env, PORT: String(port), SHOPIFY_APP_URL: BASE, NODE_EXTRA_CA_CERTS: CERT, POSTHOG_API_KEY: "", BILLING_TEST: "true" },
+  // E2E_SERVER=dev runs the Vite dev server (what `shopify app dev` runs on your laptop) instead of the build.
+  const dev = process.env.E2E_SERVER === "dev";
+  const cmd = dev ? ["react-router", "dev", "--port", String(port), "--strictPort"] : ["react-router-serve", "./build/server/index.js"];
+  const server = spawn("npx", cmd, {
+    env: { ...process.env, PORT: String(port), SHOPIFY_APP_URL: BASE, NODE_EXTRA_CA_CERTS: CERT, POSTHOG_API_KEY: "", BILLING_TEST: "true", ...(dev ? { NODE_ENV: "development" } : {}) },
     stdio: ["ignore", openSync(log, "w"), openSync(log, "a")],
   });
-  await waitFor(`${BASE}/healthz`);
+  await waitFor(`${BASE}/healthz`, dev ? 120000 : 60000);
 
   function adminUrl(path, extra = {}) {
     const u = new URL(path, BASE);

@@ -9,8 +9,8 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
-import { SHOP, HOST_PARAM, UA, prisma, sessionToken, codOrder, startApp } from "./harness.mjs";
+import { createHmac, randomUUID } from "node:crypto";
+import { SHOP, HOST_PARAM, UA, SECRET, prisma, sessionToken, codOrder, startApp } from "./harness.mjs";
 
 let app;
 let BASE;
@@ -416,6 +416,29 @@ test("Plan: cancel goes back to Free and the widget branding returns", async () 
   assert.equal((await settings()).plan, "free");
   assertPage(await page("/app/plan"), "plan after cancel");
   assertPage(await page("/app/settings"), "settings on Free (Pro fields disabled)");
+});
+
+/* ---------- storefront widgets → app proxy ---------- */
+
+/** Shopify's app proxy signature: hex HMAC-SHA256 of the sorted "key=value" pairs, concatenated. */
+function proxyQuery(extra = {}) {
+  const params = { shop: SHOP, logged_in_customer_id: "", path_prefix: "/apps/pingzest", timestamp: String(Math.floor(Date.now() / 1000)), ...extra };
+  const message = Object.keys(params).sort().map((k) => `${k}=${params[k]}`).join("");
+  const signature = createHmac("sha256", SECRET).update(message).digest("hex");
+  return new URLSearchParams({ ...params, signature }).toString();
+}
+
+test("Storefront widget beacons through the app proxy are counted; unsigned ones are ignored", async () => {
+  const beacon = JSON.stringify({ pageType: "product", device: "mobile", events: [{ widget: "chat", event: "view" }, { widget: "chat", event: "click" }, { widget: "nope", event: "view" }] });
+  const ok = await fetch(`${BASE}/proxy/track?${proxyQuery()}`, { method: "POST", headers: { "Content-Type": "text/plain" }, body: beacon });
+  assert.equal(ok.status, 204);
+  const rows = await prisma.widgetEvent.findMany({ where: { shop: SHOP, pageType: "product", device: "mobile" } });
+  assert.deepEqual(rows.map((r) => `${r.widget}:${r.event}`).sort(), ["chat:click", "chat:view"]);
+
+  const forged = await fetch(`${BASE}/proxy/track?shop=${SHOP}&timestamp=1&signature=deadbeef`, { method: "POST", body: beacon });
+  assert.equal(forged.status, 204);
+  assert.equal(await prisma.widgetEvent.count({ where: { shop: SHOP, pageType: "product", device: "mobile", widget: "chat", event: "view", count: 2 } }), 0, "forged beacon not counted");
+  assertPage(await page("/app/analytics"), "analytics with widget stats");
 });
 
 /* ---------- privacy, uninstall ---------- */
