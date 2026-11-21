@@ -95,6 +95,13 @@ jobs:
       - name: Storefront widget tests (browser)
         run: npm run test:widgets
 
+      - name: "End-to-end in the browser: sidebar, every page, settings form, mobile menu, confirm page"
+        run: npm run test:e2e:browser
+
+      - name: Browser E2E server log (on failure)
+        if: failure()
+        run: tail -200 /tmp/pingzest-e2e-browser.log 2>/dev/null || true
+
       - name: Server log (on failure)
         if: failure()
         run: cat /tmp/pingzest-server.log 2>/dev/null | tail -200 || true
@@ -104,7 +111,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: screenshots
-          path: test/widgets/*.png
+          path: |
+            test/widgets/*.png
+            test/e2e/screenshots/*.png
           if-no-files-found: ignore
 
   # Deploys main to your server after all tests pass. Turned on by setting the repository
