@@ -112,6 +112,10 @@ jobs:
       - name: "End-to-end in the browser: sidebar, every page, settings form, mobile menu, confirm page"
         run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e:browser
 
+      - name: Screenshots for review (small JPEGs, base64)
+        if: always()
+        run: for f in test/e2e/screenshots/*.jpg; do [ -f "$f" ] && echo "SHOT $(basename "$f") $(base64 -w0 "$f")"; done; true
+
       - name: Browser E2E server log (on failure)
         if: failure()
         run: tail -200 /tmp/pingzest-e2e-browser.log 2>/dev/null || true

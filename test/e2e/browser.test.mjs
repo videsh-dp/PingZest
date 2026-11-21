@@ -126,7 +126,9 @@ test("every page opens from the left sidebar without errors", async () => {
     assert.ok(active.some((t) => t.includes(label)), `${label} highlighted in the sidebar (active: ${JSON.stringify(active)})`);
     const body = await page.locator("body").innerText();
     assert.doesNotMatch(body, /Application Error|Unexpected Server Error|Something went wrong/i, `${label} rendered`);
-    await page.screenshot({ path: `${SHOTS}/${path.replace(/\//g, "_").replace(/^_/, "") || "app"}.png`, fullPage: true });
+    const name = path.replace(/\//g, "_").replace(/^_/, "") || "app";
+    await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
+    await page.screenshot({ path: `${SHOTS}/${name}.jpg`, type: "jpeg", quality: 45 }); // small copy for review
   }
   assert.deepEqual(problems, [], "no page, hydration or console errors");
   await page.context().close();
@@ -198,6 +200,7 @@ test("on a phone the sidebar becomes a Menu button", async () => {
   await page.locator(".wa-sidebar__toggle").click();
   assert.ok(await page.locator(".wa-sidebar").isVisible(), "menu opens");
   await page.screenshot({ path: `${SHOTS}/mobile-menu.png`, fullPage: true });
+  await page.screenshot({ path: `${SHOTS}/mobile-menu.jpg`, type: "jpeg", quality: 45 });
   await page.locator(".wa-sidebar").getByRole("link", { name: /^COD confirmation/ }).click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/cod");
   await page.waitForLoadState("networkidle");
