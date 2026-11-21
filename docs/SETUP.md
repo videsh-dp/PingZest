@@ -106,7 +106,7 @@ have Mumbai) if most of your merchants are in India.
    | `SHOPIFY_API_KEY` | Client ID (Dev Dashboard → your app) |
    | `SHOPIFY_API_SECRET` | Client secret |
    | `SHOPIFY_APP_URL` | Your server's public URL, e.g. `https://pingzest.onrender.com` |
-   | `SCOPES` | `read_orders,write_orders,read_discounts,write_discounts,read_locales,write_order_edits` |
+   | `SCOPES` | `read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_app_proxy` |
    | `DATABASE_URL` | Your MongoDB Atlas connection string, ending in `/pingzest?...` |
    | `NODE_ENV` | `production` |
    | `BILLING_TEST` | `true` while testing; `false` once the app is public, to take real payments |

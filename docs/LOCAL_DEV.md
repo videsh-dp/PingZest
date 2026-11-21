@@ -32,7 +32,12 @@ admin and send webhooks to it. Nothing to buy: ngrok's free plan includes one st
 npm run dev:ngrok
 ```
 
-- Starts ngrok on your domain and `shopify app dev` (log in to Shopify the first time).
+- Starts ngrok on your domain (or uses yours: `NGROK_START=false`) and `shopify app dev --config local`
+  (log in to Shopify the first time; it asks for the dev store's storefront password once:
+  *Online Store → Preferences → Password protection*).
+- `shopify.app.local.toml` is the same app without the order/checkout/fulfillment webhooks: Shopify refuses
+  those topics until the app is approved for protected customer data. Use `npm run test:webhooks` for them.
+  After approval, `npm run dev:ngrok -- --full` uses the main config with all webhooks.
 - While it runs, the app URL, redirect URLs, app proxy and **webhooks** point at your ngrok domain.
 - Press **p** in the terminal to open the app in `golibar-mrv1ujxf.myshopify.com` (approve the install the first time).
 - The storefront widgets come from the theme extension: in the dev store, *Online Store → Themes → Customize →

@@ -45,7 +45,7 @@ SHOPIFY_API_KEY=...            # Client ID
 SHOPIFY_API_SECRET=...         # Client secret
 SHOPIFY_APP_URL=https://app.yourdomain.com
 SHOPIFY_APP_HANDLE=pingzest
-SCOPES=read_orders,write_orders,read_discounts,write_discounts,read_locales,write_order_edits
+SCOPES=read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_app_proxy
 DATABASE_URL=mongodb+srv://user:pass@cluster0.xxxx.mongodb.net/pingzest?retryWrites=true&w=majority
 POSTHOG_API_KEY=phc_...
 POSTHOG_HOST=https://us.i.posthog.com

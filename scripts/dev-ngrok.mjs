@@ -14,6 +14,7 @@
  * which points the app URL, redirect URLs, app proxy and webhooks at your ngrok domain while it runs.
  */
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 
 try { process.loadEnvFile(); } catch { /* no .env: use the shell environment */ }
 
@@ -40,7 +41,12 @@ if (startNgrok) {
 }
 
 console.log("▶ shopify app dev (press p in the CLI to open the app in your dev store)");
-var app = spawn("npx", ["shopify", "app", "dev", `--tunnel-url=https://${domain}:${port}`], { stdio: "inherit", shell });
+// Until the app is approved for protected customer data, Shopify refuses the order/checkout/fulfillment
+// webhook topics, so local runs use shopify.app.local.toml (without them). `-- --full` uses the main config.
+const full = process.argv.includes("--full");
+const configArgs = full || !existsSync("shopify.app.local.toml") ? [] : ["--config", "local"];
+console.log(full ? "  (main config: all webhook topics)" : "  (local config: no order/checkout/fulfillment webhooks; use npm run test:webhooks)");
+var app = spawn("npx", ["shopify", "app", "dev", ...configArgs, `--tunnel-url=https://${domain}:${port}`], { stdio: "inherit", shell });
 
 const stop = () => { ngrok?.kill(); app.kill(); };
 process.on("SIGINT", stop);
