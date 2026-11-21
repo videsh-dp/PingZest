@@ -52,6 +52,18 @@ jobs:
           npx prisma generate
           npx prisma db push --skip-generate
 
+      - name: Storefront script is built from widget-src (and the theme block loader is under 10 KB)
+        run: |
+          node scripts/build-widget.mjs --check || { mkdir -p /tmp/built-widget && node scripts/build-widget.mjs && cp extensions/pingzest-widgets/assets/wa-widget*.js /tmp/built-widget/ && exit 1; }
+
+      - name: Upload freshly built storefront script (when the committed one is stale)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-widget
+          path: /tmp/built-widget/
+          if-no-files-found: ignore
+
       - name: Unit tests
         run: npm test
 

@@ -14,7 +14,7 @@ import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
 import { Page, Banner } from "../components/ui";
 import { Section, Row, Text, NumberField, Toggle, Choice, ColorField, PageRules, Agents } from "../components/fields";
-import widgetJs from "../../extensions/pingzest-widgets/assets/wa-widget.js?raw";
+import widgetJs from "../../widget-src/wa-widget.js?raw";
 import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
 import { trackCall, flagOn } from "../posthog.server";
 import { useFlag } from "../components/flags.jsx";

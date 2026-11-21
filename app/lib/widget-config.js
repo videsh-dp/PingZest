@@ -3,7 +3,7 @@
  * app-owned shop metafield (pingzest.config) that the theme app embed reads.
  *
  * Pure module: used by the admin (editor + validation) and mirrored by the
- * storefront script (extensions/pingzest-widgets/assets/wa-widget.js).
+ * storefront script (widget-src/wa-widget.js, built into extensions/pingzest-widgets/assets/).
  */
 import { N_ } from "../i18n/core.js";
 
