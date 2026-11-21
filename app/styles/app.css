@@ -345,3 +345,37 @@ code { background: #f3f3f3; padding: 1px 5px; border-radius: 4px; }
 .wa-fieldset:disabled { opacity: 0.55; }
 .wa-h3 { font-size: 14px; margin: 8px 0 0; }
 .wa-check { display: flex; gap: 8px; align-items: center; }
+
+/* App shell with a left sidebar */
+.wa-shell { display: flex; align-items: flex-start; min-height: 100vh; }
+.wa-shell__main { flex: 1; min-width: 0; }
+.wa-sidebar {
+  position: sticky; top: 0; flex: 0 0 220px; height: 100vh; overflow-y: auto;
+  background: var(--wa-surface); border-inline-end: 1px solid var(--wa-border);
+  padding: 16px 10px; display: flex; flex-direction: column; gap: 4px;
+}
+.wa-sidebar__brand { font-weight: 650; font-size: 16px; padding: 4px 10px 12px; color: var(--wa-primary-dark); }
+.wa-sidebar__section ul { list-style: none; margin: 0 0 8px; padding: 0; }
+.wa-sidebar__heading { font-size: 12px; font-weight: 600; color: var(--wa-muted); padding: 8px 10px 4px; }
+.wa-sidebar__link {
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px;
+  color: var(--wa-text); text-decoration: none;
+}
+.wa-sidebar__link:hover { background: #f3f3f3; }
+.wa-sidebar__link.is-active { background: var(--wa-success-bg); color: var(--wa-primary-dark); font-weight: 600; }
+.wa-sidebar__link:focus-visible, .wa-sidebar__toggle:focus-visible { outline: 2px solid #005bd3; outline-offset: 1px; }
+.wa-sidebar__icon { width: 18px; text-align: center; }
+.wa-sidebar__plan {
+  margin-top: auto; padding: 8px 10px; border-radius: 8px; background: #fafafa;
+  color: var(--wa-muted); font-size: 13px; text-decoration: none; box-shadow: 0 0 0 1px var(--wa-border);
+}
+.wa-sidebar__toggle { display: none; }
+@media (max-width: 760px) {
+  .wa-shell { display: block; }
+  .wa-sidebar { display: none; position: static; height: auto; border-inline-end: 0; border-bottom: 1px solid var(--wa-border); }
+  .wa-sidebar.is-open { display: flex; }
+  .wa-sidebar__toggle {
+    display: inline-flex; gap: 6px; align-items: center; margin: 12px 20px 0; padding: 6px 12px;
+    border: 1px solid var(--wa-border); border-radius: 8px; background: var(--wa-surface); font: inherit; cursor: pointer;
+  }
+}
