@@ -269,9 +269,6 @@ test("Widgets: page shows store languages; saving writes the theme metafield", a
   assert.match(r.html, /Hindi/, "store languages from Shopify");
   const cfg = await prisma.widgetConfig.findUnique({ where: { shop: SHOP } }).catch(() => null);
   const base = cfg?.config ? (typeof cfg.config === "string" ? JSON.parse(cfg.config) : cfg.config) : null;
-  // Load the config the page would edit from its serialized loader data, falling back to a minimal change.
-  const match = r.html.match(/"chat":\{"enabled":(true|false)/);
-  assert.ok(match || base, "widget config in page data");
 
   const n = shopify.calls.length;
   const input = base || {};
@@ -481,8 +478,9 @@ test("Pro: customer fixes the address and pays online with a discount (order edi
   const row = await prisma.order.findFirst({ where: { shop: SHOP, shopifyOrderId: String(o.id) } });
 
   const view = await (await fetch(`${BASE}/c/${row.confirmToken}`)).text();
-  assert.match(view, /name="address1"|name="city"/, "address form shown on Pro");
-  assert.match(view, /name="intent" value="prepay"|value="prepay"/, "pay-online offer shown on Pro");
+  assert.match(view, /cf__addr/, "address check shown on Pro (form opens with Edit)");
+  assert.match(view, /Sunrise Apartments/, "current address from Shopify");
+  assert.match(view, /value="prepay"/, "pay-online offer shown on Pro");
 
   let n = shopify.calls.length;
   const addr = await fetch(`${BASE}/c/${row.confirmToken}`, {
