@@ -32,7 +32,7 @@ admin and send webhooks to it. Nothing to buy: ngrok's free plan includes one st
 npm run dev:ngrok
 ```
 
-- Starts ngrok on your domain (or uses yours: `NGROK_START=false`) and `shopify app dev --config local`
+- Starts ngrok on your domain (or uses yours: `NGROK_START=false`) and `shopify app dev` with a generated, git-ignored `shopify.app.ngrok.toml` (the local config with every `https://example.com` replaced by your ngrok domain, so the app page never shows example.com)
   (log in to Shopify the first time; it asks for the dev store's storefront password once:
   *Online Store → Preferences → Password protection*).
 - `shopify.app.local.toml` is the same app without the order/checkout/fulfillment webhooks: Shopify refuses
@@ -70,3 +70,10 @@ You can also fire Shopify's own sample payloads:
   starting a trial fails.
 - **PostHog:** optional locally. Add `POSTHOG_API_KEY` to `.env` to see your local requests and errors there.
 - **Branch:** work on `dev`. Pushes to `dev` run all cloud tests; only `main` deploys to the server.
+
+## The app page shows "This domain is for use in documentation examples"
+
+That's example.com: Shopify loaded the placeholder URL instead of your ngrok domain. Stop the run, `git pull`,
+and start `npm run dev:ngrok` again (it now writes the ngrok URLs into `shopify.app.ngrok.toml`). If it still
+shows, release that config once: `npx shopify app deploy --config ngrok` (the app is unlisted, so only your dev
+store sees it), then reload the app page.
