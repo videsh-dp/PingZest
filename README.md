@@ -55,8 +55,11 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 3. The theme app embed (`blocks/app-embed.liquid`, one switch in the theme editor) prints that JSON with
    `{{ app.metafields.pingzest.config.value | json }}` plus the page type, so the storefront script needs
    no network request to load settings.
-4. `assets/wa-widget.js` builds the chat button and banner, applies page rules, styles the page buttons,
+4. The storefront script builds the chat button and banner, applies page rules, styles the page buttons,
    and sends **one** analytics request per page for views (plus one per click) to the app proxy.
+   Edit the readable source in `widget-src/wa-widget.js`, then run `npm run build:widget`: it writes the
+   minified `assets/wa-widget-core.js` and the 0.5 KB `assets/wa-widget.js` loader that the theme blocks
+   include (Shopify's theme check limits app block JavaScript to 10 KB). CI fails if you forget to rebuild.
 
 ## How the COD flow works
 
@@ -112,10 +115,22 @@ Every push runs `.github/workflows/ci.yml` on GitHub (free for public repos):
 3. **Integration tests** (`test/integration/server.test.mjs`): starts the production server and calls it the way Shopify
    does: HMAC-signed webhooks (orders, paid, plan changes, privacy), the confirm page (view + Confirm), public pages.
    A fake PostHog server checks that every request is logged and that phone numbers and addresses never leave.
-4. **Browser tests** of the storefront widgets (Playwright + Chromium); screenshots are kept as a build artifact.
+4. **End-to-end tests** (`test/e2e/`): the app against a **fake Shopify** (`test/e2e/fake-shopify.mjs`) that it
+   reaches over HTTPS at `https://e2e-store.myshopify.com`, exactly like the real one (CI points that hostname at
+   the fake and trusts its certificate). Embedded login with session tokens and token exchange, every admin page
+   in several languages, every form action (settings, templates and the Free limit, discounts, widgets, COD,
+   abandoned checkouts, order updates, plan upgrade and cancel), webhooks feeding the queues, the confirm page
+   (confirm, address fix, pay online with the order-edit discount), app proxy beacons with Shopify's signature.
+   The fake checks **every Admin API query and its variables against Shopify's real Admin schema**
+   (`scripts/fetch-admin-schema.mjs`), so a wrong field name fails here, not on a merchant's store.
+   The same suite runs again on the **Vite dev server** (what `shopify app dev` runs locally).
+5. **Browser end-to-end** (`test/e2e/browser.test.mjs`): Chromium clicks through every page from the left sidebar
+   with a stand-in for App Bridge, saves Settings from the form, checks the phone menu, confirms an order on the
+   confirm page; fails on any page, hydration or console error. Screenshots are kept as a build artifact.
+6. **Browser tests** of the storefront widgets (Playwright + Chromium).
 
-Not covered (needs a real store): Shopify Admin API calls — billing approval, order tags, the prepaid order edit,
-the address update and the theme metafield.
+Not covered (needs a real store): Shopify's own screens (the billing approval page, the theme editor) and the
+real App Bridge inside Shopify admin. See docs/LOCAL_DEV.md → "Checklist on your dev store".
 
 ## Logging, errors and feature flags (PostHog)
 
@@ -243,6 +258,8 @@ npm test                 # 96 unit tests: phone cleanup, templates (picking, val
                          # discount form, message analytics, store-address login input, languages
                          # (every string translated, placeholders and plurals intact, Intl formatting),
                          # PostHog logging (redaction, batching, flags, request middleware), plan limits
+npm run test:e2e         # end-to-end against a fake Shopify (needs the CI setup: see ci.yml)
+npm run test:e2e:browser # the same in Chromium: sidebar, every page, forms, confirm page
 npm run test:widgets     # 20 browser checks of the storefront: designs, mobile, page rules, banner,
                          # copy/apply, tracking, shopper language and right-to-left (needs `npx playwright install chromium`)
 ```

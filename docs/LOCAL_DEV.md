@@ -77,3 +77,23 @@ That's example.com: Shopify loaded the placeholder URL instead of your ngrok dom
 and start `npm run dev:ngrok` again (it now writes the ngrok URLs into `shopify.app.ngrok.toml`). If it still
 shows, release that config once: `npx shopify app deploy --config ngrok` (the app is unlisted, so only your dev
 store sees it), then reload the app page.
+
+## Checklist on your dev store
+
+CI already runs every feature end to end against a fake Shopify (see README → Cloud tests). These are the parts only
+your real store can show, about 10 minutes:
+
+1. **Open the app** from your admin (Apps → PingZest). You see Home and the left sidebar; every link opens its page.
+2. **Settings:** set the store name and your WhatsApp number, then Save.
+3. **Widgets:** turn on the chat button and press Save. Click **Turn on in theme** (opens the theme editor with the
+   PingZest embed), save the theme, then open your storefront: the chat button shows.
+4. **Test data:** in a second window, `npm run test:webhooks`. COD confirmation, Abandoned checkouts and Order
+   updates fill up. Open a COD order's confirm link from the script output on your phone and tap Confirm.
+   Order tags appear in Shopify only for real orders (the test orders don't exist in your store).
+5. **Discounts:** create `TEST10`. It appears in Shopify admin → Discounts.
+6. **Plan:** Upgrade → Shopify's approval page (a test charge on a dev store, nothing is billed) → Approve.
+   The app shows Pro. Cancel goes back to Free.
+7. **A real COD order:** place one on your storefront with Cash on Delivery. Once Shopify approves protected
+   customer data, it arrives by itself (`npm run dev:ngrok -- --full`); until then use `npm run test:webhooks`.
+
+Storefront script: edit `widget-src/wa-widget.js`, then `npm run build:widget` (the theme loads the built files).
