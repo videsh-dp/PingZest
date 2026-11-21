@@ -71,7 +71,9 @@ jobs:
             -addext "subjectAltName=DNS:e2e-store.myshopify.com" -keyout /tmp/e2e/key.pem -out /tmp/e2e/cert.pem 2>/dev/null
           echo "127.0.0.1 e2e-store.myshopify.com" | sudo tee -a /etc/hosts
           sudo iptables -t nat -A OUTPUT -o lo -p tcp --dport 443 -j REDIRECT --to-ports 8443
-          npm run test:e2e
+          npm install --no-save --no-audit --no-fund graphql@16
+          node scripts/fetch-admin-schema.mjs /tmp/e2e/admin-schema.json
+          E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e
 
       - name: E2E server log (on failure)
         if: failure()
@@ -87,7 +89,7 @@ jobs:
 
       - name: Install Playwright + Chromium
         run: |
-          npm install --no-save --no-audit --no-fund playwright@1
+          npm install --no-save --no-audit --no-fund playwright@1 graphql@16
           npx playwright install --with-deps chromium
         env:
           NODE_ENV: development
@@ -96,7 +98,7 @@ jobs:
         run: npm run test:widgets
 
       - name: "End-to-end in the browser: sidebar, every page, settings form, mobile menu, confirm page"
-        run: npm run test:e2e:browser
+        run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e:browser
 
       - name: Browser E2E server log (on failure)
         if: failure()

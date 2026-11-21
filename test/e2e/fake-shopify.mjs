@@ -7,9 +7,32 @@
  * Every call is recorded in `calls` ({ op, variables, query }) so tests can check what the app asked for.
  */
 import { createServer } from "node:https";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
-export function startFakeShopify({ port = 443, cert, key, scopes }) {
+/**
+ * With Shopify's real Admin schema (E2E_ADMIN_SCHEMA, downloaded by scripts/fetch-admin-schema.mjs) every
+ * query and its variables are checked like Shopify checks them: unknown fields, wrong argument or input
+ * types and missing required inputs come back as GraphQL errors and are recorded as `graphql_error` calls.
+ */
+async function loadValidator() {
+  const path = process.env.E2E_ADMIN_SCHEMA;
+  if (!path || !existsSync(path)) return null;
+  const g = await import("graphql");
+  const schema = g.buildClientSchema(JSON.parse(readFileSync(path, "utf8")));
+  return (query, variables) => {
+    let doc;
+    try { doc = g.parse(query); } catch (e) { return [e.message]; }
+    const errors = g.validate(schema, doc).map((e) => e.message);
+    if (errors.length) return errors;
+    const opDef = doc.definitions.find((d) => d.kind === "OperationDefinition");
+    const coerced = g.getVariableValues(schema, opDef.variableDefinitions || [], variables || {});
+    return (coerced.errors || []).map((e) => e.message);
+  };
+}
+
+export async function startFakeShopify({ port = 443, cert, key, scopes }) {
+  const validate = await loadValidator();
+  if (validate) console.log("[fake-shopify] validating queries against the real Admin API schema");
   const calls = [];
   const state = {
     subscription: null, // { id, name, status, trialDays, createdAt, test }
@@ -155,7 +178,16 @@ export function startFakeShopify({ port = 443, cert, key, scopes }) {
       if (/^\/admin\/api\/[^/]+\/graphql\.json$/.test(url.pathname)) {
         let body = {};
         try { body = JSON.parse(raw); } catch { /* empty */ }
-        const data = resolve(String(body.query || ""), body.variables || {});
+        const query = String(body.query || "");
+        const problems = validate ? validate(query, body.variables) : [];
+        if (problems.length) {
+          const op = (query.match(/\b(?:query|mutation)\s+(\w+)/) || [])[1] || "anonymous";
+          calls.push({ op: "graphql_error", variables: { operation: op, errors: problems }, query });
+          console.error(`[fake-shopify] ${op} rejected by the Admin schema: ${problems.join(" | ")}`);
+          res.end(JSON.stringify({ errors: problems.map((message) => ({ message })) }));
+          return;
+        }
+        const data = resolve(query, body.variables || {});
         res.end(JSON.stringify({ data, extensions: { cost: { actualQueryCost: 1, throttleStatus: { currentlyAvailable: 1999 } } } }));
         return;
       }
@@ -165,7 +197,7 @@ export function startFakeShopify({ port = 443, cert, key, scopes }) {
       res.end(JSON.stringify({ errors: "Not Found" }));
     });
   });
-  return new Promise((ok, fail) => {
+  return await new Promise((ok, fail) => {
     server.once("error", fail);
     server.listen(port, "127.0.0.1", () => ok({ calls, state, close: () => server.close(), opsCalled: () => calls.map((c) => c.op) }));
   });

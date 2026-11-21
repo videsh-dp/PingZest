@@ -435,4 +435,7 @@ test("Privacy webhooks are stored; uninstall removes the sessions", async () => 
 test("the app never called Shopify for anything the fake doesn't know", () => {
   const unknown = shopify.calls.filter((c) => c.op.startsWith("unhandled"));
   assert.deepEqual(unknown, [], "unexpected Shopify requests");
+  const invalid = shopify.calls.filter((c) => c.op === "graphql_error").map((c) => c.variables);
+  assert.deepEqual(invalid, [], "every Admin API query and its variables are valid for the real Shopify schema");
+  if (process.env.CI) assert.ok(process.env.E2E_ADMIN_SCHEMA, "schema validation is on in CI");
 });
