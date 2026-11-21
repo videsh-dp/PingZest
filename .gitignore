@@ -6,3 +6,4 @@ build
 .shopify
 test/widgets/*.png
 .react-router
+shopify.app.ngrok*.toml
