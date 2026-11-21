@@ -126,5 +126,15 @@ jobs:
           scp -q /tmp/pingzest-${{ github.sha }}.tgz "$USER@$HOST:/tmp/"
           ssh "$USER@$HOST" "tar -xzf /tmp/pingzest-${{ github.sha }}.tgz -O deploy/release.sh > /tmp/pingzest-release.sh && bash /tmp/pingzest-release.sh ${{ github.sha }}"
 
+      - name: Push app config, webhooks and theme extension to Shopify
+        if: vars.APP_DOMAIN != ''
+        env:
+          SHOPIFY_CLI_PARTNERS_TOKEN: ${{ secrets.SHOPIFY_CLI_PARTNERS_TOKEN }}
+          APP_DOMAIN: ${{ vars.APP_DOMAIN }}
+        run: |
+          if [ -z "$SHOPIFY_CLI_PARTNERS_TOKEN" ]; then echo "::warning::Add the SHOPIFY_CLI_PARTNERS_TOKEN secret to push the app config to Shopify"; exit 0; fi
+          sed -i "s#https://example.com#https://$APP_DOMAIN#g" shopify.app.toml
+          npx -y @shopify/cli@3 app deploy --allow-updates --message "CI ${GITHUB_SHA::7}"
+
       - name: Check the live site
         run: curl -fsS --retry 5 --retry-delay 3 "https://${{ vars.APP_DOMAIN || vars.DEPLOY_HOST }}/healthz" || echo "::warning::Couldn't reach the public URL (set the APP_DOMAIN variable to check it)"
