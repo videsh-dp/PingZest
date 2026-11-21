@@ -474,3 +474,5 @@ ui-nav-menu { display: none !important; }
 .wa-list__actions .wa-button--secondary, .wa-list__actions .wa-button--critical { min-height: 28px; padding: 3px 10px; font-size: 13px; }
 .wa-list__actions .wa-button--primary { order: -1; }
 @media (max-width: 760px) { .wa-list__actions { min-width: 0; } }
+/* Narrow panels (Widgets editor): wrap tabs instead of hiding some off to the side */
+.wa-editor-panel .wa-tabs { flex-wrap: wrap; overflow: visible; }
