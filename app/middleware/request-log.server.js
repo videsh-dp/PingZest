@@ -18,6 +18,7 @@ const STOREFRONT_SAMPLE = Number(process.env.POSTHOG_STOREFRONT_SAMPLE ?? 0.01);
 export async function requestLog({ request }, next) {
   const started = Date.now();
   const url = new URL(request.url);
+  if (url.pathname === "/healthz") return next(); // uptime checks would only fill the free plan
   const kind = requestKind(request);
   const shop = shopFromRequest(request);
   const requestId = request.headers.get("x-request-id") || randomUUID();

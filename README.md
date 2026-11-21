@@ -93,6 +93,11 @@ Then add `ja` to `LOCALES` in `app/i18n/core.js` and to `app/i18n/dictionaries.j
 `extensions/pingzest-widgets/locales/ja.json`. Have a native speaker review the drafts. `npm test` fails until every
 string is translated (`node scripts/extract-i18n.mjs --check` lists what's missing).
 
+## Deploying
+
+Own server with nginx + PM2 (about ₹530/month): see **[docs/DEPLOY.md](docs/DEPLOY.md)**. One setup script for a fresh
+Ubuntu server, then every push to `main` that passes the tests deploys automatically (with health check and rollback).
+
 ## Cloud tests (GitHub Actions)
 
 Every push runs `.github/workflows/ci.yml` on GitHub (free for public repos):

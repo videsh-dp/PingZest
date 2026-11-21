@@ -85,3 +85,46 @@ jobs:
           name: screenshots
           path: test/widgets/*.png
           if-no-files-found: ignore
+
+  # Deploys main to your server after all tests pass. Turned on by setting the repository
+  # variable DEPLOY_HOST (and DEPLOY_USER + secret DEPLOY_SSH_KEY); see docs/DEPLOY.md.
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build
+        run: |
+          npm install --no-audit --no-fund --include=dev
+          npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Package release
+        run: tar -czf /tmp/pingzest-${{ github.sha }}.tgz build package.json prisma ecosystem.config.cjs deploy public
+
+      - name: Upload and release on the server
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER: ${{ vars.DEPLOY_USER || 'deploy' }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_ed25519 && chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          scp -q /tmp/pingzest-${{ github.sha }}.tgz "$USER@$HOST:/tmp/"
+          ssh "$USER@$HOST" "tar -xzf /tmp/pingzest-${{ github.sha }}.tgz -O deploy/release.sh > /tmp/pingzest-release.sh && bash /tmp/pingzest-release.sh ${{ github.sha }}"
+
+      - name: Check the live site
+        run: curl -fsS --retry 5 --retry-delay 3 "https://${{ vars.APP_DOMAIN || vars.DEPLOY_HOST }}/healthz" || echo "::warning::Couldn't reach the public URL (set the APP_DOMAIN variable to check it)"

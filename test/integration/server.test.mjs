@@ -132,6 +132,12 @@ test("landing and login pages render, with the PostHog snippet", async () => {
 
 /* ---------- webhooks ---------- */
 
+test("health check answers when the app and MongoDB are up", async () => {
+  const r = await fetch(`${BASE}/healthz`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(await r.json(), { ok: true });
+});
+
 test("webhooks with a bad signature are rejected", async () => {
   const r = await webhook("/webhooks/orders", "orders/create", codOrder(), { secret: "wrong" });
   assert.equal(r.status, 401);
