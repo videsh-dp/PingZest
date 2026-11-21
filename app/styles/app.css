@@ -462,3 +462,8 @@ a.wa-chip { text-decoration: none; color: inherit; }
 /* Shopify's admin menu (App Bridge <ui-nav-menu>) is read by App Bridge, never shown in the page.
    Without this it renders as a row of plain links before App Bridge loads, or outside Shopify admin. */
 ui-nav-menu { display: none !important; }
+.wa-seg--links { margin-bottom: 8px; }
+.wa-seg__item { padding: 4px 12px; border-radius: 6px; color: var(--wa-muted); text-decoration: none; font-weight: 550; font-size: 13px; white-space: nowrap; }
+.wa-seg__item.is-active { background: #fff; color: var(--wa-text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.wa-tabs-row { flex-wrap: nowrap; }
+@media (max-width: 760px) { .wa-tabs-row { flex-wrap: wrap; } }

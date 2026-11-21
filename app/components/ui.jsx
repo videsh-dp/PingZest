@@ -72,17 +72,17 @@ export function StatusBadge({ status }) {
  * Tabs that filter what the server loads (each tab is a link: ?filter=…). Use TabBar for tabs that
  * only switch panels on the page.
  */
-export function Tabs({ tabs, param = "filter", label }) {
+export function Tabs({ tabs, param = "filter", label, variant }) {
   const tr = useT();
   const [params] = useSearchParams();
   const current = params.get(param) || tabs[0].id;
   return (
-    <nav className="wa-tabs" aria-label={label || tr("Filter")}>
+    <nav className={variant === "segmented" ? "wa-seg wa-seg--links" : "wa-tabs"} aria-label={label || tr("Filter")}>
       {tabs.map((t) => {
         const next = new URLSearchParams(params);
         next.set(param, t.id);
         return (
-          <Link key={t.id} to={`?${next.toString()}`} className={`wa-tab ${current === t.id ? "is-active" : ""}`} aria-current={current === t.id ? "page" : undefined} preventScrollReset>
+          <Link key={t.id} to={`?${next.toString()}`} className={`${variant === "segmented" ? "wa-seg__item" : "wa-tab"} ${current === t.id ? "is-active" : ""}`} aria-current={current === t.id ? "page" : undefined} preventScrollReset>
             {t.label}
             {typeof t.count === "number" && <span className="wa-tab__count">{t.count}</span>}
           </Link>

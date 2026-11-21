@@ -142,7 +142,7 @@ export default function Analytics() {
       tabs={
         <div className="wa-row-between wa-tabs-row">
           <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "messages", label: tr("Messages") }, { id: "widgets", label: tr("Widgets") }]} />
-          <Tabs param="days" label={tr("Date range")} tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
+          <Tabs param="days" variant="segmented" label={tr("Date range")} tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
         </div>
       }
     >
