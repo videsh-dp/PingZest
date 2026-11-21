@@ -1,6 +1,6 @@
 import "@shopify/shopify-app-react-router/adapters/node";
 import { ApiVersion, AppDistribution, BillingInterval, shopifyApp } from "@shopify/shopify-app-react-router/server";
-import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+import { PingZestSessionStorage } from "./session-storage.server";
 import prisma from "./db.server";
 import { BILLING_PLANS, TRIAL_DAYS } from "./lib/plans.js";
 
@@ -15,8 +15,10 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  sessionStorage: new PrismaSessionStorage(prisma),
+  sessionStorage: new PingZestSessionStorage(prisma),
   distribution: AppDistribution.AppStore,
+  // Shopify's Admin API no longer accepts non-expiring offline tokens; expiring ones refresh automatically.
+  future: { expiringOfflineAccessTokens: true },
   // Online tokens identify the staff member who's signed in (name shown in the app).
   // Shopify still stores an offline token at install for webhooks and the public confirm page.
   useOnlineTokens: true,
