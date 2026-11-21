@@ -467,3 +467,10 @@ ui-nav-menu { display: none !important; }
 .wa-seg__item.is-active { background: #fff; color: var(--wa-text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
 .wa-tabs-row { flex-wrap: nowrap; }
 @media (max-width: 760px) { .wa-tabs-row { flex-wrap: wrap; } }
+
+/* List row actions: the primary action stands out, the rest stay compact */
+.wa-list__actions { min-width: 220px; }
+.wa-list__actions .wa-actions { align-items: center; }
+.wa-list__actions .wa-button--secondary, .wa-list__actions .wa-button--critical { min-height: 28px; padding: 3px 10px; font-size: 13px; }
+.wa-list__actions .wa-button--primary { order: -1; }
+@media (max-width: 760px) { .wa-list__actions { min-width: 0; } }
