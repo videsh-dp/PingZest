@@ -64,6 +64,19 @@ jobs:
       - name: Integration tests (real server + MongoDB, signed webhooks, fake PostHog)
         run: npm run test:integration
 
+      - name: "End-to-end: every admin page and action against a fake Shopify (HTTPS)"
+        run: |
+          mkdir -p /tmp/e2e
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj "/CN=e2e-store.myshopify.com" \
+            -addext "subjectAltName=DNS:e2e-store.myshopify.com" -keyout /tmp/e2e/key.pem -out /tmp/e2e/cert.pem 2>/dev/null
+          echo "127.0.0.1 e2e-store.myshopify.com" | sudo tee -a /etc/hosts
+          sudo iptables -t nat -A OUTPUT -o lo -p tcp --dport 443 -j REDIRECT --to-ports 8443
+          npm run test:e2e
+
+      - name: E2E server log (on failure)
+        if: failure()
+        run: tail -300 /tmp/pingzest-e2e-server.log 2>/dev/null || true
+
       - name: Test-data script (npm run test:webhooks) against the production server
         run: |
           PORT=3000 npx react-router-serve ./build/server/index.js > /tmp/pingzest-server.log 2>&1 &
