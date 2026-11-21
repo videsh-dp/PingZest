@@ -114,7 +114,12 @@ jobs:
 
       - name: Screenshots for review (small JPEGs, base64)
         if: always()
-        run: for f in test/e2e/screenshots/*.jpg; do [ -f "$f" ] && echo "SHOT $(basename "$f") $(base64 -w0 "$f")"; done; true
+        run: |
+          for f in test/e2e/screenshots/*.jpg; do
+            [ -f "$f" ] || continue
+            n=0; base64 -w 4000 "$f" | while read -r chunk; do n=$((n+1)); echo "SHOT $(basename "$f") $n $chunk"; done
+          done
+          true
 
       - name: Browser E2E server log (on failure)
         if: failure()
