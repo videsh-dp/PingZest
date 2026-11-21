@@ -62,7 +62,11 @@ async function newPage({ mobile = false } = {}) {
   });
   page.on("response", (r) => {
     if (r.status() >= 500 && r.url().startsWith(app.BASE)) problems.push(`${r.url()} HTTP ${r.status()}`);
+    if (r.url().startsWith(app.BASE) && r.request().resourceType() !== "document" && !/\/assets\//.test(r.url())) {
+      console.log(`  [net] ${r.request().method()} ${r.url().replace(app.BASE, "").split("?")[0]} → ${r.status()}`);
+    }
   });
+  page.on("framenavigated", (f) => { if (f === page.mainFrame()) console.log(`  [nav] ${f.url().replace(app.BASE, "").split("?")[0]}`); });
   return page;
 }
 
@@ -113,8 +117,12 @@ test("every page opens from the left sidebar without errors", async () => {
     await page.locator(".wa-sidebar").getByRole("link", { name: label, exact: true }).click();
     await page.waitForURL((u) => new URL(u).pathname === path, { timeout: 15000 });
     await page.waitForLoadState("networkidle");
-    const active = await page.locator(".wa-sidebar__link.is-active").innerText();
-    assert.match(active, new RegExp(label), `${label} highlighted in the sidebar`);
+    await page.waitForTimeout(300);
+    const active = await page.locator(".wa-sidebar__link.is-active").allInnerTexts();
+    const heading = await page.locator("h1, .wa-page__title").first().innerText().catch(() => "(no heading)");
+    console.log(`  ${label}: url=${new URL(page.url()).pathname} active=${JSON.stringify(active)} heading=${JSON.stringify(heading)}`);
+    if (!active.some((t) => t.includes(label))) await page.screenshot({ path: `${SHOTS}/FAIL-${label.replace(/\W+/g, "-")}.png`, fullPage: true });
+    assert.ok(active.some((t) => t.includes(label)), `${label} highlighted in the sidebar (active: ${JSON.stringify(active)})`);
     const body = await page.locator("body").innerText();
     assert.doesNotMatch(body, /Application Error|Unexpected Server Error|Something went wrong/i, `${label} rendered`);
     await page.screenshot({ path: `${SHOTS}/${path.replace(/\//g, "_").replace(/^_/, "") || "app"}.png`, fullPage: true });
