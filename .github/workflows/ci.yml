@@ -54,15 +54,12 @@ jobs:
 
       - name: Storefront script is built from widget-src (and the theme block loader is under 10 KB)
         run: |
-          node scripts/build-widget.mjs --check || { mkdir -p /tmp/built-widget && node scripts/build-widget.mjs && cp extensions/pingzest-widgets/assets/wa-widget*.js /tmp/built-widget/ && exit 1; }
-
-      - name: Upload freshly built storefront script (when the committed one is stale)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: built-widget
-          path: /tmp/built-widget/
-          if-no-files-found: ignore
+          node scripts/build-widget.mjs --check || {
+            node scripts/build-widget.mjs
+            # The built files, for copying when they can't be built locally.
+            for f in extensions/pingzest-widgets/assets/wa-widget*.js; do echo "BUILT-FILE $f $(gzip -9c "$f" | base64 -w0)"; done
+            exit 1
+          }
 
       - name: Unit tests
         run: npm test
