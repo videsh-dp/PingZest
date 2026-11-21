@@ -25,6 +25,9 @@ const CERT = process.env.E2E_CERT || "/tmp/e2e/cert.pem";
 const KEY = process.env.E2E_KEY || "/tmp/e2e/key.pem";
 const HOST_PARAM = Buffer.from(`admin.shopify.com/store/${SHOP.replace(".myshopify.com", "")}`).toString("base64url");
 
+// A real browser's user agent: Shopify's library answers 410 to requests that look like bots (Node's fetch does).
+const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
+
 const prisma = new PrismaClient();
 let server;
 let shopify;
@@ -51,7 +54,7 @@ function adminUrl(path, extra = {}) {
 
 /** GET an admin page as Shopify admin loads it in the iframe. */
 async function page(path, extra) {
-  const res = await fetch(adminUrl(path, extra), { redirect: "manual" });
+  const res = await fetch(adminUrl(path, extra), { redirect: "manual", headers: { "User-Agent": UA } });
   return { status: res.status, html: await res.text(), headers: res.headers };
 }
 
@@ -60,7 +63,7 @@ async function act(path, fields) {
   const res = await fetch(adminUrl(path), {
     method: "POST",
     redirect: "manual",
-    headers: { Authorization: `Bearer ${sessionToken()}`, "Content-Type": "application/x-www-form-urlencoded" },
+    headers: { "User-Agent": UA, Authorization: `Bearer ${sessionToken()}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams(fields),
   });
   return { status: res.status, html: await res.text(), headers: res.headers };
@@ -153,10 +156,10 @@ test("opening the app authenticates with the session token (token exchange) and 
 });
 
 test("a request without a valid session token doesn't get in", async () => {
-  const r = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=not.a.jwt`, { redirect: "manual" });
+  const r = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=not.a.jwt`, { redirect: "manual", headers: { "User-Agent": UA } });
   assert.notEqual(r.status, 200);
   const forged = sessionToken().replace(/.$/, (c) => (c === "A" ? "B" : "A"));
-  const r2 = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=${forged}`, { redirect: "manual" });
+  const r2 = await fetch(`${BASE}/app?embedded=1&shop=${SHOP}&host=${HOST_PARAM}&id_token=${forged}`, { redirect: "manual", headers: { "User-Agent": UA } });
   assert.notEqual(r2.status, 200);
 });
 
