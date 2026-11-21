@@ -159,7 +159,9 @@ test("on a phone the sidebar becomes a Menu button", async () => {
   await page.locator(".wa-sidebar").getByRole("link", { name: "COD confirmation", exact: true }).click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/cod");
   await page.waitForLoadState("networkidle");
+  await page.locator(".wa-sidebar").waitFor({ state: "hidden", timeout: 3000 });
   assert.equal(await page.locator(".wa-sidebar").isVisible(), false, "menu closes after navigating");
+  assert.match(await page.locator("h1, .wa-page__title").first().innerText(), /COD/, "COD page shown");
   assert.deepEqual(problems, []);
   await page.context().close();
 });

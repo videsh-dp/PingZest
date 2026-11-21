@@ -113,7 +113,8 @@ function Sidebar({ plan }) {
       <button type="button" className="wa-sidebar__toggle" aria-expanded={open} aria-controls="wa-sidebar" onClick={() => setOpen((v) => !v)}>
         <span aria-hidden="true">☰</span> {tr("Menu")}
       </button>
-      <nav id="wa-sidebar" className={`wa-sidebar${open ? " is-open" : ""}`} aria-label={tr("PingZest navigation")}>
+      <nav id="wa-sidebar" className={`wa-sidebar${open ? " is-open" : ""}`} aria-label={tr("PingZest navigation")}
+        onClick={(e) => { if (e.target.closest("a")) setOpen(false); }}>
         <div className="wa-sidebar__brand">PingZest</div>
         {NAV_SECTIONS.map((section, si) => (
           <div className="wa-sidebar__section" key={si}>
