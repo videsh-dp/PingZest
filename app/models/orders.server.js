@@ -85,7 +85,9 @@ export async function cartQueue(shop, { delayMin = 30, filter = "todo" } = {}) {
   const where =
     filter === "sent"
       ? { shop, status: "sent" }
-      : filter === "recovered"
+      : filter === "dismissed"
+        ? { shop, status: "dismissed", completed: false }
+        : filter === "recovered"
         ? { shop, recovered: true }
         : { ...base, status: "pending", updatedAt: { lte: cutoff }, createdAt: { gte: new Date(Date.now() - 7 * DAY) } };
   return prisma.checkout.findMany({ where, orderBy: { updatedAt: "desc" }, take: 100 });
@@ -128,6 +130,11 @@ export async function setCodStatus(shop, id, status, by = "merchant") {
 export async function markCheckoutSent(shop, id, templateId = null) {
   return prisma.checkout.updateMany({ where: { id, shop }, data: { status: "sent", sentAt: new Date(), templateId } });
 }
+/** Undo a dismiss: the checkout goes back to "To send" (if it's still within the 7 days). */
+export async function restoreCheckout(shop, id) {
+  return prisma.checkout.updateMany({ where: { id, shop, status: "dismissed" }, data: { status: "pending" } });
+}
+
 export async function dismissCheckout(shop, id) {
   return prisma.checkout.updateMany({ where: { id, shop }, data: { status: "dismissed" } });
 }

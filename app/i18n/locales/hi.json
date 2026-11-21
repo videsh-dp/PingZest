@@ -582,5 +582,7 @@
   "Widget settings": "विजेट सेटिंग्स",
   "Your store details, how orders are tagged, and the Pro money-savers.": "आपके स्टोर की जानकारी, ऑर्डर पर टैग कैसे लगें, और Pro के पैसे बचाने वाले टूल।",
   "{count} to send": "भेजने के लिए {count}",
-  "{done} of {total} done": "{total} में से {done} पूरे"
+  "{done} of {total} done": "{total} में से {done} पूरे",
+  "Restore": "वापस लाएँ",
+  "Nothing dismissed": "कुछ भी हटाया नहीं गया"
 }

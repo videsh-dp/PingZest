@@ -583,5 +583,7 @@
   "Widget settings": "Widget-Einstellungen",
   "Your store details, how orders are tagged, and the Pro money-savers.": "Deine Shop-Daten, wie Bestellungen getaggt werden, und die Pro-Sparhelfer.",
   "{count} to send": "{count} zu senden",
-  "{done} of {total} done": "{done} von {total} erledigt"
+  "{done} of {total} done": "{done} von {total} erledigt",
+  "Restore": "Wiederherstellen",
+  "Nothing dismissed": "Nichts verworfen"
 }

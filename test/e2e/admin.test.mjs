@@ -276,6 +276,12 @@ test("Abandoned checkouts: webhook → queue after the delay → send, dismiss; 
   assert.equal((await prisma.checkout.findUnique({ where: { id: rowA.id } })).status, "sent");
   await act("/app/carts", { intent: "dismiss", id: rowB.id });
   assert.equal((await prisma.checkout.findUnique({ where: { id: rowB.id } })).status, "dismissed");
+  const dismissedTab = await page("/app/carts", { filter: "dismissed" });
+  assertPage(dismissedTab, "carts dismissed tab");
+  assert.match(dismissedTab.html, /Neha/, "dismissed checkout listed with Restore");
+  await act("/app/carts", { intent: "restore", id: rowB.id });
+  assert.equal((await prisma.checkout.findUnique({ where: { id: rowB.id } })).status, "pending", "restored to To send");
+  await act("/app/carts", { intent: "dismiss", id: rowB.id });
 
   // The shopper finishes checkout after the reminder: an order with that checkout token → recovered.
   await webhook("/webhooks/orders", "orders/create", codOrder({ checkout_token: a.token, payment_gateway_names: ["Razorpay"] }));

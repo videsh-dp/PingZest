@@ -594,5 +594,7 @@
   "Widget settings": "إعدادات الأداة",
   "Your store details, how orders are tagged, and the Pro money-savers.": "بيانات متجرك، وكيفية وسم الطلبات، وموفّرات Pro.",
   "{count} to send": "{count} للإرسال",
-  "{done} of {total} done": "تم {done} من {total}"
+  "{done} of {total} done": "تم {done} من {total}",
+  "Restore": "استعادة",
+  "Nothing dismissed": "لا شيء مستبعد"
 }

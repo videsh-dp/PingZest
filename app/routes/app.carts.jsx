@@ -2,7 +2,7 @@ import { useLoaderData, useRouteLoaderData, useSearchParams } from "react-router
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
-import { cartQueue, markCheckoutSent, dismissCheckout, logSend } from "../models/orders.server";
+import { cartQueue, markCheckoutSent, dismissCheckout, restoreCheckout, logSend } from "../models/orders.server";
 import { cartRowData, templatesFor, pickLang } from "../models/messages.server";
 import { formatMoney } from "../lib/orders.js";
 import { useT } from "../i18n/react.jsx";
@@ -46,6 +46,7 @@ export const action = async ({ request }) => {
     await logSend(session.shop, { kind: "abandoned_cart", refId: id, templateId, templateName: form.templateName, lang: form.lang });
   }
   if (form.intent === "dismiss") await dismissCheckout(session.shop, id);
+  if (form.intent === "restore") await restoreCheckout(session.shop, id);
   return { ok: true };
 };
 
@@ -61,6 +62,7 @@ export default function Carts() {
     { id: "todo", label: tr("To send"), count: counts.carts },
     { id: "sent", label: tr("Sent") },
     { id: "recovered", label: tr("Recovered") },
+    { id: "dismissed", label: tr("Dismissed") },
   ];
   const columns = [
     {
@@ -85,6 +87,7 @@ export default function Carts() {
           {r.status === "pending" && <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} />}
           {r.status === "pending" && <ActionButton intent="dismiss" id={r.id}>{tr("Dismiss")}</ActionButton>}
           {r.status === "sent" && <span className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</span>}
+          {r.status === "dismissed" && <ActionButton intent="restore" id={r.id}>{tr("Restore")}</ActionButton>}
         </div>
       ),
     },
@@ -109,7 +112,7 @@ export default function Carts() {
           searchPlaceholder={tr("Search customers, phone numbers or products")}
           toolbar={filter === "todo" ? <SendWith templates={forLang} chosen={chosen} lang={lang} langs={langs} /> : null}
           empty={
-            <EmptyState icon="🛒" title={filter === "recovered" ? tr("No recovered checkouts yet") : tr("No abandoned checkouts right now")}>
+            <EmptyState icon="🛒" title={filter === "recovered" ? tr("No recovered checkouts yet") : filter === "dismissed" ? tr("Nothing dismissed") : tr("No abandoned checkouts right now")}>
               {filter === "todo" ? tr("Checkouts show up here {delay} minutes after the shopper leaves, so they have time to finish on their own.", { delay }) : null}
             </EmptyState>
           }
