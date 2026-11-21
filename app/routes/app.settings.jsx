@@ -4,7 +4,8 @@ import { getSettings, saveSettings } from "../models/settings.server";
 import { formatPhone } from "../lib/phone.js";
 import { LOCALES } from "../i18n/core.js";
 import { useT } from "../i18n/react.jsx";
-import { Page, Card, Banner } from "../components/ui";
+import { useEffect } from "react";
+import { Page, Card, Banner, TabBar, useTabState } from "../components/ui";
 import { Link } from "react-router";
 import { hasFeature, planOf } from "../lib/plans.js";
 
@@ -55,11 +56,33 @@ export default function Settings() {
   const nav = useNavigation();
   const errors = result?.errors || {};
   const s = result?.settings || settings;
+  const [tab, setTab] = useTabState(["general", "orders", "pro", "account"]);
+  // A field with an error may be on another tab: show it.
+  useEffect(() => { if (errors.whatsappNumber) setTab("general"); }, [errors.whatsappNumber]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <Page title={tr("Settings")}>
+    <Page
+      title={tr("Settings")}
+      subtitle={tr("Your store details, how orders are tagged, and the Pro money-savers.")}
+      tabs={
+        <TabBar
+          label={tr("Settings")}
+          current={tab}
+          onSelect={setTab}
+          tabs={[
+            { id: "general", label: tr("General") },
+            { id: "orders", label: tr("Orders") },
+            { id: "pro", label: tr("COD money-savers"), badge: pro ? null : "Pro" },
+            { id: "account", label: tr("Account") },
+          ]}
+        />
+      }
+    >
       {result?.settings && <Banner tone="success">{tr("Settings saved.")}</Banner>}
-      <Form method="post">
+      {result?.errors && <Banner tone="critical">{tr("Check the highlighted fields.")}</Banner>}
+      {/* One form across the tabs, so Save keeps every field (hidden tabs are still submitted). */}
+      <Form method="post" hidden={tab === "account"}>
+        <div role="tabpanel" hidden={tab !== "general"}>
         <Card title={tr("Language")}>
           <label className="wa-field">
             <span className="wa-field__label">{tr("App language")}</span>
@@ -90,6 +113,8 @@ export default function Settings() {
           </label>
         </Card>
 
+        </div>
+        <div role="tabpanel" hidden={tab !== "orders"}>
         <Card title={tr("COD confirmation")}>
           <Field label={tr("Tag for confirmed orders")} name="confirmedTag" defaultValue={s.confirmedTag} help={tr("Added to the Shopify order when the customer confirms.")} />
           <Field label={tr("Tag for cancelled orders")} name="cancelledTag" defaultValue={s.cancelledTag} help={tr("Filter these in Shopify Orders and cancel them before shipping.")} />
@@ -99,6 +124,8 @@ export default function Settings() {
           <Field label={tr("Show checkouts after (minutes)")} name="abandonDelayMin" type="number" min={10} max={1440} defaultValue={s.abandonDelayMin} help={tr("Gives shoppers time to finish on their own first.")} />
         </Card>
 
+        </div>
+        <div role="tabpanel" hidden={tab !== "pro"}>
         <Card title={tr("COD money-savers (Pro)")}>
           {!pro && (
             <p className="wa-banner wa-banner--info">
@@ -124,6 +151,7 @@ export default function Settings() {
             <label className="wa-check"><input type="checkbox" name="addressCheck" defaultChecked={s.addressCheck} /> {tr("Let customers fix their address or add a landmark on the confirm page")}</label>
           </fieldset>
         </Card>
+        </div>
 
         <div className="wa-sticky-actions">
           <button type="submit" className="wa-button wa-button--primary" disabled={nav.state !== "idle"}>
@@ -131,7 +159,7 @@ export default function Settings() {
           </button>
         </div>
       </Form>
-      <Account />
+      {tab === "account" && <Account />}
     </Page>
   );
 }

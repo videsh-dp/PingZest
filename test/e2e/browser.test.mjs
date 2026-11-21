@@ -114,7 +114,8 @@ test("every page opens from the left sidebar without errors", async () => {
   assert.ok(await page.locator(".wa-sidebar").isVisible(), "sidebar visible on desktop");
 
   for (const [label, path] of PAGES) {
-    await page.locator(".wa-sidebar").getByRole("link", { name: label, exact: true }).click();
+    // Queue links also announce their badge ("COD confirmation 3 to send").
+    await page.locator(".wa-sidebar").getByRole("link", { name: new RegExp(`^${label}`) }).click();
     await page.waitForURL((u) => new URL(u).pathname === path, { timeout: 15000 });
     await page.waitForLoadState("networkidle");
     await page.waitForTimeout(300);
@@ -128,6 +129,47 @@ test("every page opens from the left sidebar without errors", async () => {
     await page.screenshot({ path: `${SHOTS}/${path.replace(/\//g, "_").replace(/^_/, "") || "app"}.png`, fullPage: true });
   }
   assert.deepEqual(problems, [], "no page, hydration or console errors");
+  await page.context().close();
+});
+
+test("sidebar shows work waiting; lists search; tabs keep their place in the URL", async () => {
+  const page = await newPage();
+  await page.goto(app.adminUrl("/app/cod"), { waitUntil: "networkidle" });
+  const badge = page.locator(".wa-sidebar__link", { hasText: "COD confirmation" }).locator(".wa-sidebar__badge");
+  assert.ok(Number(await badge.innerText()) >= 1, "COD badge counts orders to send");
+  assert.match(await page.locator(".wa-page__eyebrow").innerText(), /orders/i, "category label above the title");
+
+  // Search narrows the list and offers a way back.
+  const rowsBefore = await page.locator(".wa-list__table tbody tr").count();
+  assert.ok(rowsBefore >= 1, "COD list has rows");
+  await page.locator(".wa-search__input").fill("zzz-no-such-order");
+  await page.locator(".wa-empty", { hasText: "No matches" }).waitFor();
+  await page.getByRole("button", { name: "Clear search" }).click();
+  assert.equal(await page.locator(".wa-list__table tbody tr").count(), rowsBefore);
+  await page.screenshot({ path: `${SHOTS}/cod-list.png`, fullPage: true });
+
+  // Settings tabs: switch to Orders, the URL remembers it, and saving keeps fields from the other tabs.
+  await page.goto(app.adminUrl("/app/settings"), { waitUntil: "networkidle" });
+  const before = await prisma.shopSettings.findUnique({ where: { shop: SHOP } });
+  await page.getByRole("tab", { name: "Orders" }).click();
+  assert.match(page.url(), /tab=orders/);
+  await page.locator('input[name="confirmedTag"]').fill("ui-confirmed");
+  await page.getByRole("button", { name: "Save settings" }).click();
+  for (let i = 0; i < 20; i++) {
+    if ((await prisma.shopSettings.findUnique({ where: { shop: SHOP } }))?.confirmedTag === "ui-confirmed") break;
+    await page.waitForTimeout(250);
+  }
+  const saved = await prisma.shopSettings.findUnique({ where: { shop: SHOP } });
+  assert.equal(saved.confirmedTag, "ui-confirmed");
+  assert.equal(saved.storeName, before.storeName, "fields on the General tab kept");
+  assert.equal(saved.abandonDelayMin, before.abandonDelayMin);
+  await page.screenshot({ path: `${SHOTS}/settings-orders-tab.png`, fullPage: true });
+
+  // Discounts: tabs filter, Create opens the form.
+  await page.goto(app.adminUrl("/app/discounts"), { waitUntil: "networkidle" });
+  assert.ok(await page.locator('input[name="code"]').isVisible(), "create form open when there are no codes yet");
+  await page.screenshot({ path: `${SHOTS}/discounts.png`, fullPage: true });
+  assert.deepEqual(problems, []);
   await page.context().close();
 });
 
@@ -156,7 +198,7 @@ test("on a phone the sidebar becomes a Menu button", async () => {
   await page.locator(".wa-sidebar__toggle").click();
   assert.ok(await page.locator(".wa-sidebar").isVisible(), "menu opens");
   await page.screenshot({ path: `${SHOTS}/mobile-menu.png`, fullPage: true });
-  await page.locator(".wa-sidebar").getByRole("link", { name: "COD confirmation", exact: true }).click();
+  await page.locator(".wa-sidebar").getByRole("link", { name: /^COD confirmation/ }).click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/cod");
   await page.waitForLoadState("networkidle");
   await page.locator(".wa-sidebar").waitFor({ state: "hidden", timeout: 3000 });

@@ -150,6 +150,18 @@ export async function findByToken(token) {
 
 /* ---------- stats ---------- */
 
+/** Work waiting on each queue page, for the sidebar badges and tab counts. Same rules as the queues. */
+export async function navCounts(shop, { delayMin = 30 } = {}) {
+  const cutoff = new Date(Date.now() - delayMin * 60 * 1000);
+  const [cod, carts, shipped, delivered] = await Promise.all([
+    prisma.order.count({ where: { shop, isCod: true, codStatus: "pending" } }),
+    prisma.checkout.count({ where: { shop, completed: false, phone: { not: null }, status: "pending", updatedAt: { lte: cutoff }, createdAt: { gte: new Date(Date.now() - 7 * DAY) } } }),
+    prisma.order.count({ where: { shop, shippedAt: { not: null }, AND: [empty("shippedMsgSentAt")] } }),
+    prisma.order.count({ where: { shop, deliveredAt: { not: null }, AND: [empty("deliveredMsgSentAt")] } }),
+  ]);
+  return { cod, carts, updates: shipped + delivered, shipped, delivered };
+}
+
 export async function dashboardStats(shop) {
   const since = new Date(Date.now() - 30 * DAY);
   const [codTodo, codWaiting, confirmed, cancelled, cartsSent, recovered, updatesTodo, clicks] = await Promise.all([

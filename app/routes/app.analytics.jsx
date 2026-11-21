@@ -139,11 +139,13 @@ export default function Analytics() {
     <Page
       title={tr("Analytics")}
       subtitle={tr("Messages you send and how shoppers use your widgets. Widget numbers are daily totals only: no cookies or personal data.")}
+      tabs={
+        <div className="wa-row-between wa-tabs-row">
+          <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "messages", label: tr("Messages") }, { id: "widgets", label: tr("Widgets") }]} />
+          <Tabs param="days" label={tr("Date range")} tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
+        </div>
+      }
     >
-      <div className="wa-row-between">
-        <Tabs param="view" tabs={[{ id: "messages", label: tr("Messages") }, { id: "widgets", label: tr("Widgets") }]} />
-        <Tabs param="days" tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
-      </div>
 
       {view === "messages" ? <MessagesView m={a.messages} /> : empty ? (
         <Card>

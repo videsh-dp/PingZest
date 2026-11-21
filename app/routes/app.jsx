@@ -6,6 +6,8 @@ import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { staffName } from "../lib/shop.js";
 import { syncPlan } from "../models/billing.server";
+import { navCounts } from "../models/orders.server";
+import { NAV_SECTIONS, NAV_ITEMS } from "../lib/nav.js";
 import { adminLocale, dictionaryFor } from "../i18n/server.js";
 import { I18nProvider, useT } from "../i18n/react.jsx";
 import { dirOf } from "../i18n/core.js";
@@ -23,12 +25,15 @@ export const loader = async ({ request }) => {
   const locale = adminLocale({ request, session, settings });
   const profile = { plan: settings.plan || "free", app_locale: locale, country_code: settings.countryCode };
   identifyShop(session.shop, profile);
-  const flags = await getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } });
-  return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan };
+  const [flags, counts] = await Promise.all([
+    getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } }),
+    navCounts(session.shop, { delayMin: settings.abandonDelayMin }).catch(() => ({})),
+  ]);
+  return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan, counts };
 };
 
 export default function App() {
-  const { apiKey, locale, dict, flags, shop, plan } = useLoaderData();
+  const { apiKey, locale, dict, flags, shop, plan, counts } = useLoaderData();
   // Browser analytics and errors are grouped under the shop (no staff or customer details).
   useEffect(() => {
     if (typeof window !== "undefined" && window.posthog?.identify) window.posthog.identify(shop, { shop, plan });
@@ -39,7 +44,7 @@ export default function App() {
         <FlagsProvider flags={flags}>
           <div lang={locale} dir={dirOf(locale)} className="wa-shell">
             <Nav />
-            <Sidebar plan={plan} />
+            <Sidebar plan={plan} counts={counts || {}} />
             <main className="wa-shell__main">
               <Outlet />
             </main>
@@ -50,43 +55,7 @@ export default function App() {
   );
 }
 
-// One list drives both menus: Shopify's admin sidebar (NavMenu) and the app's own left sidebar.
-// Labels are English keys translated with tr(); N_ marks them for the extractor.
-const N_ = (s) => s;
-export const NAV_SECTIONS = [
-  { title: null, items: [{ to: "/app", label: N_("Home"), icon: "⌂", end: true }] },
-  {
-    title: N_("Orders"),
-    items: [
-      { to: "/app/cod", label: N_("COD confirmation"), icon: "✓" },
-      { to: "/app/carts", label: N_("Abandoned checkouts"), icon: "🛒" },
-      { to: "/app/updates", label: N_("Order updates"), icon: "📦" },
-    ],
-  },
-  {
-    title: N_("Storefront"),
-    items: [
-      { to: "/app/widgets", label: N_("Widgets"), icon: "💬" },
-      { to: "/app/discounts", label: N_("Discounts"), icon: "％" },
-    ],
-  },
-  {
-    title: N_("Messages"),
-    items: [
-      { to: "/app/templates", label: N_("Message templates"), icon: "✉" },
-      { to: "/app/analytics", label: N_("Analytics"), icon: "📈" },
-    ],
-  },
-  {
-    title: N_("Account"),
-    items: [
-      { to: "/app/settings", label: N_("Settings"), icon: "⚙" },
-      { to: "/app/plan", label: N_("Plan"), icon: "★" },
-    ],
-  },
-];
-const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
-
+// app/lib/nav.js drives both menus: Shopify's admin menu (NavMenu) and the app's own left sidebar.
 function Nav() {
   const tr = useT();
   return (
@@ -99,7 +68,7 @@ function Nav() {
 }
 
 /** The app's own left sidebar: always there, so the app is easy to get around wherever it's opened. */
-function Sidebar({ plan }) {
+function Sidebar({ plan, counts }) {
   const tr = useT();
   const { pathname, search } = useLocation();
   const [open, setOpen] = useState(false);
@@ -124,7 +93,10 @@ function Sidebar({ plan }) {
                 <li key={i.to}>
                   <NavLink to={`${i.to}${qs}`} end={i.end} className={({ isActive }) => `wa-sidebar__link${isActive ? " is-active" : ""}`}>
                     <span className="wa-sidebar__icon" aria-hidden="true">{i.icon}</span>
-                    <span>{tr(i.label)}</span>
+                    <span className="wa-sidebar__label">{tr(i.label)}</span>
+                    {i.badge && counts[i.badge] > 0 ? (
+                      <span className="wa-sidebar__badge" aria-label={tr("{count} to send", { count: counts[i.badge] })}>{counts[i.badge] > 99 ? "99+" : counts[i.badge]}</span>
+                    ) : null}
                   </NavLink>
                 </li>
               ))}

@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useFetcher, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { listDiscounts, createDiscount, toggleDiscount, removeDiscount } from "../models/discounts.server";
 import { getWidgetConfig } from "../models/widgets.server";
-import { Page, Card, Banner, EmptyState, ActionButton } from "../components/ui";
+import { Page, Card, Banner, EmptyState, ActionButton, ListView, TabBar, useTabState } from "../components/ui";
 import prisma from "../db.server";
 import { useT } from "../i18n/react.jsx";
 import { toId } from "../lib/ids.js";
@@ -38,7 +38,7 @@ export const action = async ({ request }) => {
   return { error: "Unknown action" };
 };
 
-function CreateForm() {
+function CreateForm({ onClose }) {
   const tr = useT();
   const fetcher = useFetcher();
   const formRef = useRef(null);
@@ -47,7 +47,11 @@ function CreateForm() {
   useEffect(() => { if (created) formRef.current?.reset(); }, [created]);
 
   return (
-    <Card title={tr("Create a discount code")}>
+    <Card className="wa-card--panel">
+      <div className="wa-row-between">
+        <h2 className="wa-card__title">{tr("Create a discount code")}</h2>
+        {onClose && <button type="button" className="wa-button wa-button--plain" onClick={onClose}>{tr("Close")}</button>}
+      </div>
       {created && (
         <Banner tone="success">
           <strong>{created.code}</strong> {tr("is live in your Shopify discounts.")} <Link to="/app/widgets">{tr("Show it in the discount banner →")}</Link>
@@ -103,48 +107,77 @@ function CreateForm() {
 export default function Discounts() {
   const tr = useT();
   const { discounts, bannerCode } = useLoaderData();
+  const [creating, setCreating] = useState(discounts.length === 0);
+  const [tab, setTab] = useTabState(["all", "active", "paused"]);
+  const active = discounts.filter((d) => d.active);
+  const paused = discounts.filter((d) => !d.active);
+  const rows = tab === "active" ? active : tab === "paused" ? paused : discounts;
+  const offer = (d) => (d.kind === "percentage" ? tr("{value}% off", { value: d.value }) : tr("{amount} off", { amount: tr.money(d.value, "INR") }));
+  const limits = (d) => [
+    d.minSubtotal ? tr("min. {amount}", { amount: tr.money(d.minSubtotal, "INR") }) : null,
+    d.oncePerCustomer ? tr("once per customer") : null,
+    d.endsAt ? tr("ends {date}", { date: tr.date(d.endsAt, { day: "numeric", month: "short", year: "numeric" }) }) : null,
+  ].filter(Boolean).join(" · ") || tr("No limits");
+
+  const columns = [
+    {
+      key: "code", label: tr("Code"), primary: true,
+      render: (d) => (
+        <>
+          <strong className="wa-code">{d.code}</strong>
+          {bannerCode === d.code && <div><span className="wa-badge wa-badge--info">{tr("In banner")}</span></div>}
+          {bannerCode === d.code && !d.active && <p className="wa-warn">{tr("Paused but still in the banner: shoppers will see a code that doesn't work.")}</p>}
+        </>
+      ),
+    },
+    { key: "offer", label: tr("Offer"), render: (d) => (<>{offer(d)}<div className="wa-muted">{limits(d)}</div></>) },
+    { key: "uses", label: tr("Orders"), render: (d) => d.uses },
+    { key: "status", label: tr("Status"), render: (d) => <span className={`wa-badge wa-badge--${d.active ? "success" : "neutral"}`}>{d.active ? tr("Active") : tr("Paused")}</span> },
+    {
+      key: "actions", label: tr("Actions"), align: "right",
+      render: (d) => (
+        <div className="wa-actions">
+          {d.active
+            ? <ActionButton intent="deactivate" id={d.id}>{tr("Pause")}</ActionButton>
+            : <ActionButton intent="activate" id={d.id}>{tr("Activate")}</ActionButton>}
+          <ActionButton intent="delete" id={d.id} tone="critical" confirmText={tr("Delete {code}? It stops working in your store immediately.", { code: d.code })}>{tr("Delete")}</ActionButton>
+        </div>
+      ),
+    },
+  ];
+
   return (
-    <Page title={tr("Discounts")} subtitle={tr("Create discount codes in your Shopify store and show them in the discount banner. Shoppers apply them in one tap.")}>
-      <CreateForm />
-      <Card title={tr("Your codes")}>
-        {discounts.length === 0 ? (
-          <EmptyState title={tr("No codes yet")}>{tr("Codes you create here also appear in Shopify admin → Discounts.")}</EmptyState>
-        ) : (
-          <table className="wa-table">
-            <thead><tr><th>{tr("Code")}</th><th>{tr("Offer")}</th><th>{tr("Orders")}</th><th>{tr("Status")}</th><th className="wa-right">{tr("Actions")}</th></tr></thead>
-            <tbody>
-              {discounts.map((d) => (
-                <tr key={d.id}>
-                  <td>
-                    <strong className="wa-code">{d.code}</strong>
-                    {bannerCode === d.code && <div><span className="wa-badge wa-badge--info">{tr("In banner")}</span></div>}
-                    {bannerCode === d.code && !d.active && <p className="wa-warn">{tr("Paused but still in the banner: shoppers will see a code that doesn't work.")}</p>}
-                  </td>
-                  <td>
-                    {d.kind === "percentage" ? tr("{value}% off", { value: d.value }) : tr("{amount} off", { amount: tr.money(d.value, "INR") })}
-                    <div className="wa-muted">
-                      {[
-                        d.minSubtotal ? tr("min. {amount}", { amount: tr.money(d.minSubtotal, "INR") }) : null,
-                        d.oncePerCustomer ? tr("once per customer") : null,
-                        d.endsAt ? tr("ends {date}", { date: tr.date(d.endsAt, { day: "numeric", month: "short", year: "numeric" }) }) : null,
-                      ].filter(Boolean).join(" · ") || tr("No limits")}
-                    </div>
-                  </td>
-                  <td>{d.uses}</td>
-                  <td><span className={`wa-badge wa-badge--${d.active ? "success" : "neutral"}`}>{d.active ? tr("Active") : tr("Paused")}</span></td>
-                  <td className="wa-right">
-                    <div className="wa-actions">
-                      {d.active
-                        ? <ActionButton intent="deactivate" id={d.id}>{tr("Pause")}</ActionButton>
-                        : <ActionButton intent="activate" id={d.id}>{tr("Activate")}</ActionButton>}
-                      <ActionButton intent="delete" id={d.id} tone="critical" confirmText={tr("Delete {code}? It stops working in your store immediately.", { code: d.code })}>{tr("Delete")}</ActionButton>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+    <Page
+      title={tr("Discounts")}
+      subtitle={tr("Create discount codes in your Shopify store and show them in the discount banner. Shoppers apply them in one tap.")}
+      actions={!creating && <button type="button" className="wa-button wa-button--primary" onClick={() => setCreating(true)}>{tr("Create discount")}</button>}
+      tabs={
+        <TabBar
+          label={tr("Discount codes")}
+          current={tab}
+          onSelect={setTab}
+          tabs={[
+            { id: "all", label: tr("All"), count: discounts.length },
+            { id: "active", label: tr("Active"), count: active.length },
+            { id: "paused", label: tr("Paused"), count: paused.length },
+          ]}
+        />
+      }
+    >
+      {creating && <CreateForm onClose={discounts.length ? () => setCreating(false) : null} />}
+      <Card className="wa-card--list">
+        <ListView
+          rows={rows}
+          columns={columns}
+          caption={tr("Your codes")}
+          searchText={(d) => `${d.code} ${d.title || ""}`}
+          searchPlaceholder={tr("Search codes")}
+          empty={
+            <EmptyState icon="％" title={discounts.length ? tr("Nothing here yet") : tr("No codes yet")}>
+              {tr("Codes you create here also appear in Shopify admin → Discounts.")}
+            </EmptyState>
+          }
+        />
       </Card>
     </Page>
   );

@@ -9,7 +9,7 @@ import prisma from "../db.server";
 import { TEMPLATE_TYPES, LANGUAGES, VARIABLES, DEFAULT_TEMPLATES, STARTER_TEMPLATES, renderTemplate, validateTemplate } from "../lib/templates.js";
 import { wrapSelection, prefixLines, insertAt, FORMAT_HELP } from "../lib/whatsapp-format.js";
 import { MAX_PREFILL_LENGTH } from "../lib/whatsapp.js";
-import { Page, Card, Banner, WaBubble } from "../components/ui";
+import { Page, Card, Banner, WaBubble, TabBar } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
 import { translateTexts, translationEnabled } from "../lib/translate.js";
@@ -237,14 +237,18 @@ export default function Templates() {
   }
 
   return (
-    <Page title={tr("Message templates")} subtitle={tr("Write your own messages for each stage, then pick one in the queue when you send.")}>
-      <nav className="wa-tabs">
-        {Object.entries(TEMPLATE_TYPES).map(([k, meta]) => (
-          <button key={k} type="button" className={`wa-tab ${type === k ? "is-active" : ""}`} onClick={() => go({ type: k, id: null })}>
-            {tr(meta.label)}<span className="wa-tab__count">{templates.filter((t) => t.type === k && t.lang === lang).length}</span>
-          </button>
-        ))}
-      </nav>
+    <Page
+      title={tr("Message templates")}
+      subtitle={tr("Write your own messages for each stage, then pick one in the queue when you send.")}
+      tabs={
+        <TabBar
+          label={tr("Message stage")}
+          current={type}
+          onSelect={(k) => go({ type: k, id: null })}
+          tabs={Object.entries(TEMPLATE_TYPES).map(([k, meta]) => ({ id: k, label: tr(meta.label), count: templates.filter((t) => t.type === k && t.lang === lang).length }))}
+        />
+      }
+    >
 
       <div className="wa-tpl-layout">
         <Card className="wa-tpl-list">

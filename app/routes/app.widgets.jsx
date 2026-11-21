@@ -12,7 +12,7 @@ import { previewHtml, PREVIEW_PAGES } from "../lib/preview.js";
 import { formatPhone } from "../lib/phone.js";
 import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
-import { Page, Banner } from "../components/ui";
+import { Page, Banner, TabBar, useTabState } from "../components/ui";
 import { Section, Row, Text, NumberField, Toggle, Choice, ColorField, PageRules, Agents } from "../components/fields";
 import widgetJs from "../../widget-src/wa-widget.js?raw";
 import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
@@ -175,7 +175,7 @@ export default function Widgets() {
   const fetcher = useFetcher();
   const [config, setConfig] = useState(data.config);
   const [saved, setSaved] = useState(JSON.stringify(data.config));
-  const [tab, setTab] = useState("chat");
+  const [tab, setTab] = useTabState(TABS.map(([id]) => id));
   const [device, setDevice] = useState("desktop");
   const [pageType, setPageType] = useState("product");
   const [srcDoc, setSrcDoc] = useState("");
@@ -240,11 +240,12 @@ export default function Widgets() {
 
       <div className="wa-editor-layout">
         <div className="wa-editor-panel">
-          <nav className="wa-tabs wa-tabs--editor">
-            {TABS.filter(([id]) => id !== "languages" || showLanguages).map(([id, label]) => (
-              <button key={id} type="button" className={`wa-tab ${tab === id ? "is-active" : ""}`} onClick={() => setTab(id)}>{tr(label)}</button>
-            ))}
-          </nav>
+          <TabBar
+            label={tr("Widget settings")}
+            current={tab}
+            onSelect={setTab}
+            tabs={TABS.filter(([id]) => id !== "languages" || showLanguages).map(([id, label]) => ({ id, label: tr(label) }))}
+          />
 
           {tab === "chat" && (
             <>

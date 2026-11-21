@@ -16,8 +16,8 @@ import prisma from "../db.server";
 import { toId } from "../lib/ids.js";
 import { N_ } from "../i18n/core.js";
 import {
-  Page, Card, Tabs, LangSwitch, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState,
-  useQueueTemplate, TemplatePicker,
+  Page, Card, Tabs, StatusBadge, SendButton, ActionButton, MessagePreview, EmptyState,
+  useQueueTemplate, ListView, SendWith,
 } from "../components/ui";
 
 export const loader = async ({ request }) => {
@@ -123,76 +123,92 @@ export default function CodQueue() {
     return `?${p}`;
   };
   const tabs = Object.entries(COD_FILTERS).map(([id, f]) => ({ id, label: tr(f.label), count: counts[id] }));
+  const canSend = ["todo", "waiting", "no_reply"].includes(filter);
+  const list = rows.map((row) => ({ ...row, ...compose(row) }));
+
+  const columns = [
+    {
+      key: "order", label: tr("Order"), primary: true,
+      render: (r) => (<><strong>{r.orderName}</strong><div className="wa-muted">{tr.ago(r.createdAt)} · {r.amount}</div></>),
+    },
+    {
+      key: "customer", label: tr("Customer"),
+      render: (r) => (
+        <>
+          {r.customerName || "—"}
+          <div className="wa-muted">{r.phoneDisplay ? <bdi dir="ltr">{r.phoneDisplay}</bdi> : tr("No phone")}{r.optIn ? ` · ${tr("opted in")}` : ""}</div>
+          <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
+        </>
+      ),
+    },
+    {
+      key: "status", label: tr("Status"),
+      render: (r) => (
+        <>
+          <StatusBadge status={r.status} />
+          {r.risk && <RiskBadge risk={r.risk} />}
+          {r.paidOnline && <div><span className="wa-badge wa-badge--success">{tr("Paid online")}</span></div>}
+          {r.addressFixed && <div className="wa-muted">{tr("Address updated by customer")}</div>}
+          {r.sentAt && r.status === "sent" && <div className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</div>}
+          {r.respondedBy === "customer" && <div className="wa-muted">{tr("by customer")}</div>}
+        </>
+      ),
+    },
+    {
+      key: "actions", label: tr("Actions"), align: "right",
+      render: (r) => (
+        <div className="wa-actions">
+          {(r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
+            <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? tr("Send on WhatsApp") : tr("Send again")} />
+          )}
+          {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
+          {r.status !== "cancelled" && (
+            <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText={tr("Mark this order as cancelled by the customer?")}>{tr("Cancelled")}</ActionButton>
+          )}
+          {r.status === "sent" && <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }}>{tr("No reply")}</ActionButton>}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <Page
       title={tr("COD confirmation")}
       subtitle={tr("Confirm Cash on Delivery orders before you ship. Customers tap the link in the message to confirm or cancel.")}
-      actions={<div className="wa-row-gap"><TemplatePicker templates={forLang} chosen={chosen} /><LangSwitch lang={lang} langs={langs} /></div>}
+      tabs={<Tabs tabs={tabs} label={tr("COD orders")} />}
     >
-      <Tabs tabs={tabs} />
-      {pro ? (
-        <div className="wa-row-gap wa-risk-filter" role="group" aria-label={tr("Risk")}>
-          <span className="wa-muted wa-small">{tr("Risk")}:</span>
-          <Link className={!risk ? "wa-chip is-active" : "wa-chip"} to={riskLink(null)}>{tr("All")}</Link>
-          {["high", "medium", "low"].map((l) => (
-            <Link key={l} className={risk === l ? "wa-chip is-active" : "wa-chip"} to={riskLink(l)}>{tr(RISK_LABELS[l])}</Link>
-          ))}
-        </div>
-      ) : teaser?.high > 0 ? (
+      {pro ? null : teaser?.high > 0 ? (
         <div className="wa-banner wa-banner--warning">
           {tr.plural("{count} COD order in the last 30 days looked risky.", "{count} COD orders in the last 30 days looked risky.", teaser.high)}{" "}
           <Link to="/app/plan">{tr("See which ones with Pro")}</Link>
         </div>
       ) : null}
-      <Card>
-        {rows.length === 0 ? (
-          <EmptyState title={filter === "todo" ? tr("All caught up 🎉") : tr("Nothing here yet")}>
-            {filter === "todo" ? tr("New COD orders appear here automatically.") : null}
-          </EmptyState>
-        ) : (
-          <table className="wa-table">
-            <thead>
-              <tr><th>{tr("Order")}</th><th>{tr("Customer")}</th><th>{tr("Amount")}</th><th>{tr("Status")}</th><th className="wa-right">{tr("Actions")}</th></tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => ({ ...row, ...compose(row) })).map((r) => (
-                <tr key={r.id}>
-                  <td>
-                    <strong>{r.orderName}</strong>
-                    <div className="wa-muted">{tr.ago(r.createdAt)}</div>
-                  </td>
-                  <td>
-                    {r.customerName || "—"}
-                    <div className="wa-muted">{r.phoneDisplay ? <bdi dir="ltr">{r.phoneDisplay}</bdi> : tr("No phone")}{r.optIn ? ` · ${tr("opted in")}` : ""}</div>
-                    <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
-                  </td>
-                  <td>{r.amount}</td>
-                  <td>
-                    <StatusBadge status={r.status} />
-                    {r.risk && <RiskBadge risk={r.risk} />}
-                    {r.paidOnline && <div><span className="wa-badge wa-badge--success">{tr("Paid online")}</span></div>}
-                    {r.addressFixed && <div className="wa-muted">{tr("Address updated by customer")}</div>}
-                    {r.sentAt && r.status === "sent" && <div className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</div>}
-                    {r.respondedBy === "customer" && <div className="wa-muted">{tr("by customer")}</div>}
-                  </td>
-                  <td className="wa-right">
-                    <div className="wa-actions">
-                      {(r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
-                        <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? tr("Send on WhatsApp") : tr("Send again")} />
-                      )}
-                      {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
-                      {r.status !== "cancelled" && (
-                        <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText={tr("Mark this order as cancelled by the customer?")}>{tr("Cancelled")}</ActionButton>
-                      )}
-                      {r.status === "sent" && <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }}>{tr("No reply")}</ActionButton>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+      <Card className="wa-card--list">
+        <ListView
+          rows={list}
+          columns={columns}
+          caption={tr("COD orders")}
+          searchText={(r) => `${r.orderName} ${r.customerName} ${r.phoneDisplay || ""}`}
+          searchPlaceholder={tr("Search orders, customers or phone numbers")}
+          toolbar={
+            <>
+              {pro && (
+                <div className="wa-row-gap wa-risk-filter" role="group" aria-label={tr("Risk")}>
+                  <Link className={!risk ? "wa-chip is-active" : "wa-chip"} to={riskLink(null)}>{tr("All")}</Link>
+                  {["high", "medium", "low"].map((l) => (
+                    <Link key={l} className={risk === l ? "wa-chip is-active" : "wa-chip"} to={riskLink(l)}>{tr(RISK_LABELS[l])}</Link>
+                  ))}
+                </div>
+              )}
+              {canSend && <SendWith templates={forLang} chosen={chosen} lang={lang} langs={langs} />}
+            </>
+          }
+          empty={
+            <EmptyState icon={filter === "todo" ? "🎉" : "✓"} title={filter === "todo" ? tr("All caught up 🎉") : tr("Nothing here yet")}>
+              {filter === "todo" ? tr("New COD orders appear here automatically.") : null}
+            </EmptyState>
+          }
+        />
       </Card>
       <p className="wa-muted wa-footnote">
         {tr("Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders. PingZest doesn't cancel orders for you.")}

@@ -53,7 +53,7 @@ export default function Index() {
   ];
 
   return (
-    <Page title={app.staff ? tr("Welcome, {name}", { name: app.staff.split(" ")[0] }) : "PingZest"} subtitle={`${tr("Free plan")} · ${settings.storeName || app.shop || ""}`}>
+    <Page title={app.staff ? tr("Welcome, {name}", { name: app.staff.split(" ")[0] }) : "PingZest"} subtitle={`${app.plan === "pro" ? tr("Pro plan") : tr("Free plan")} · ${settings.storeName || app.shop || ""}`}>
       {stats.codTodo > 0 && (
         <Banner tone="attention">
           <strong>{tr.plural("{count} COD order needs confirmation.", "{count} COD orders need confirmation.", stats.codTodo)}</strong>{" "}
@@ -89,6 +89,10 @@ export default function Index() {
       </div>
 
       <Card title={tr("Set up in a few minutes")}>
+        <div className="wa-progress" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={steps.filter((x) => x.done).length} aria-label={tr("Setup progress")}>
+          <span className="wa-progress__bar" style={{ width: `${Math.round((steps.filter((x) => x.done).length / steps.length) * 100)}%` }} />
+        </div>
+        <p className="wa-muted wa-small">{tr("{done} of {total} done", { done: steps.filter((x) => x.done).length, total: steps.length })}</p>
         <ol className="wa-steps">
           {steps.map((s, i) => (
             <li key={i} className={`wa-step ${s.done ? "is-done" : ""}`}>
