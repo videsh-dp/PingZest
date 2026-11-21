@@ -85,7 +85,7 @@ your real store can show, about 10 minutes:
 
 1. **Open the app** from your admin (Apps → PingZest). You see Home and the left sidebar; every link opens its page.
 2. **Settings:** set the store name and your WhatsApp number, then Save.
-3. **Widgets:** turn on the chat button and press Save. Click **Turn on in theme** (opens the theme editor with the
+3. **Widgets:** turn on the chat button and press Save. Click **Turn on PingZest in your theme** (opens the theme editor with the
    PingZest embed), save the theme, then open your storefront: the chat button shows.
 4. **Test data:** in a second window, `npm run test:webhooks`. COD confirmation, Abandoned checkouts and Order
    updates fill up. Open a COD order's confirm link from the script output on your phone and tap Confirm.
