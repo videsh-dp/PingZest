@@ -20,7 +20,12 @@ export const action = async ({ request }) => {
   const form = await request.formData();
   const fixed = new FormData();
   fixed.set("shop", normalizeShopInput(form.get("shop")));
-  const errors = loginErrorMessage(await login(new Request(request.url, { method: "POST", body: fixed, headers: request.headers })));
+  // Don't reuse the browser's Content-Type / Content-Length: they describe the original body (its multipart
+  // boundary and size), not `fixed`, and login() would fail to parse the form ("Error: Bad Request").
+  const headers = new Headers(request.headers);
+  headers.delete("content-type");
+  headers.delete("content-length");
+  const errors = loginErrorMessage(await login(new Request(request.url, { method: "POST", body: fixed, headers })));
   return { errors };
 };
 

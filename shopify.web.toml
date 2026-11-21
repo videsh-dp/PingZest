@@ -1,0 +1,10 @@
+# Tells `shopify app dev` how to run the web app (React Router + Vite).
+# Without this file the CLI only serves the theme extension and its proxy answers "Invalid path /".
+name = "React Router"
+roles = ["frontend", "backend"]
+webhooks_path = "/webhooks/app/uninstalled"
+
+[commands]
+# MongoDB: no migrations. Run `npm run setup` (prisma db push) after changing prisma/schema.prisma.
+predev = "npx prisma generate"
+dev = "npx react-router dev"

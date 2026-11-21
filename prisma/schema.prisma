@@ -10,8 +10,11 @@ datasource db {
 }
 
 // Shopify session storage (same shape as Shopify's app template)
+// MongoDB layout from Shopify's PrismaSessionStorage docs: `id` must NOT be `_id`, because the storage
+// upserts with `id` inside `update` and MongoDB can't change `_id` ("Invalid prisma.session.upsert()").
 model Session {
-  id            String    @id @map("_id")
+  dbId          String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @unique
   shop          String
   state         String
   isOnline      Boolean   @default(false)
