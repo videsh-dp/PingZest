@@ -226,6 +226,9 @@ test("customer confirms the order on the confirm page (phone)", async () => {
   await page.locator('button[value="confirmed"]').click();
   await page.locator(".cf__result").waitFor();
   await page.screenshot({ path: `${SHOTS}/confirm-after.png`, fullPage: true });
+  // The page shows the result as soon as the tap is sent; Shopify is called while the request finishes.
+  await page.waitForLoadState("networkidle");
+  for (let i = 0; i < 40 && !app.shopify.calls.some((c) => c.op === "tagOrder"); i++) await page.waitForTimeout(250);
   assert.equal((await prisma.order.findUnique({ where: { id: order.id } })).codStatus, "confirmed");
   assert.ok(app.shopify.calls.some((c) => c.op === "tagOrder"), "order tagged in Shopify");
   assert.deepEqual(problems, []);
