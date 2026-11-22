@@ -658,6 +658,7 @@ export function useFormDirty(formRef, savedKey) {
     const take = () => { snap.current = read(); setDirty(false); };
     take();
     const t = setTimeout(take, 300);
+    if (typeof customElements !== "undefined") Promise.all(["s-checkbox", "s-text-field"].map((n) => customElements.whenDefined(n))).then(() => setTimeout(take, 0));
     // Listen in the capture phase (Polaris fields may not bubble their events) and read after the field
     // has handled the event and updated its value.
     const check = () => setTimeout(() => setDirty(read().text !== snap.current.text), 0);
@@ -696,7 +697,16 @@ export function SelectField({ label, name, defaultValue, options, help, disabled
 
 /** Polaris checkbox. */
 export function CheckboxField({ label, name, defaultChecked, help, disabled }) {
-  return <s-checkbox label={label} name={name} checked={flag(defaultChecked)} details={help} disabled={flag(disabled)} />;
+  const ref = useRef(null);
+  // The checked state is a property on s-checkbox: set it once the element is defined (and again after a save).
+  useEffect(() => {
+    let live = true;
+    const apply = () => { if (live && ref.current) ref.current.checked = Boolean(defaultChecked); };
+    if (typeof customElements !== "undefined" && !customElements.get("s-checkbox")) customElements.whenDefined("s-checkbox").then(apply);
+    else apply();
+    return () => { live = false; };
+  }, [defaultChecked]);
+  return <s-checkbox ref={ref} label={label} name={name} checked={flag(defaultChecked)} defaultChecked={flag(defaultChecked)} details={help} disabled={flag(disabled)} />;
 }
 
 export function MessagePreview({ message, missing = [], warning }) {

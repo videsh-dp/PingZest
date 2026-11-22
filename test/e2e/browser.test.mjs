@@ -357,6 +357,9 @@ test("Settings: save bar appears on change, guards leaving, saves, and keeps fie
   assert.equal(saved.confirmedTag, "ui-confirmed");
   assert.equal(saved.storeName, before.storeName, "fields on the other tab kept");
   assert.equal(saved.abandonDelayMin, before.abandonDelayMin);
+  assert.equal(saved.cancelRestock, before.cancelRestock, "checkboxes keep their saved state");
+  assert.equal(saved.codHold, before.codHold);
+  assert.equal(await page.locator('s-checkbox[name="cancelRestock"]').evaluate((el) => el.checked), before.cancelRestock, "checkbox shows the saved state");
   await page.waitForLoadState("networkidle");
   await bar.waitFor({ state: "detached" }).catch(() => {});
   assert.equal(await page.locator('ui-save-bar[data-open="true"]').count(), 0, "save bar gone after saving");
