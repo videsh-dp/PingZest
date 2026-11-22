@@ -318,11 +318,13 @@ async function seed() {
 
   // Four custom templates (the Free plan allows 5).
   for (const [name, type, body] of [
-    ["Short & friendly", "cod_confirm", "Hi {name} 👋 Please confirm your {store} order {order_no} ({total}): {confirm_link}"],
-    ["Festive", "cod_confirm", "🪔 Hi {name}, thank you for shopping with {store}! Tap to confirm order {order_no}: {confirm_link}"],
+    ["Short & friendly", "cod_confirm", "Hi {name} 👋 Please confirm your {store_name} order {order_no} ({amount}): {confirm_link}"],
+    ["Festive", "cod_confirm", "🪔 Hi {name}, thank you for shopping with {store_name}! Tap to confirm order {order_no}: {confirm_link}"],
     ["Hinglish", "cod_confirm", "Namaste {name}! Aapka order {order_no} confirm karne ke liye yahan tap karein: {confirm_link}"],
-    ["Cart nudge", "abandoned_cart", "Hi {name}, you left something at {store}. Complete your order here: {checkout_link}"],
+    ["Cart nudge", "abandoned_cart", "Hi {name}, you left something at {store_name}. Complete your order here: {checkout_link}"],
   ]) await app.act("/app/templates", { intent: "create", type, lang: "en", name, body });
+  const custom = await prisma.messageTemplate.count({ where: { shop: SHOP, seeded: false } });
+  if (custom !== 4) throw new Error(`seed: expected 4 custom templates, got ${custom}`);
 
   // Widget views and clicks from the storefront.
   for (let i = 0; i < 6; i++) {
