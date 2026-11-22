@@ -50,3 +50,31 @@ Effort: **S** ≤ 2 days · **M** = 1–2 weeks · **L** = 2–3 weeks or more.
 - UI-19: language preview in English and Hindi side by side in the template editor (C).
 
 **Built for Shopify badge:** it also needs 50 net installs on paid plans and 5 reviews (BFS 1.2), so treat it as a goal for after launch. Phase 0 is still worth doing before App Store review.
+
+---
+
+## Status (branch `ui-overhaul`, Nov 2026)
+
+UI-01 to UI-17 are **Done**. UI-18 and UI-19 are still "Later".
+
+| ID | Status | Commits | Notes |
+|---|---|---|---|
+| UI-01 | Done | efe83ef | Sidebar, its CSS and the mobile "Menu" button removed. The counts now sit in Home's **Today** list and in the queue tab counts. |
+| UI-02 | Done | efe83ef | NavMenu has 7 items and no emoji: COD confirmation · Abandoned checkouts · Order updates · Templates · Widgets · Analytics · Settings. The three queues stay separate and first, so the daily COD loop is one click away. Discounts moved to `/app/widgets/discounts` and Plan to `/app/settings/plan`; the old URLs redirect. |
+| UI-03 | Done | efe83ef | The primary colour is the admin's near-black. WhatsApp green is used only for the WhatsApp icon, bubbles and previews. "Send on WhatsApp" is a secondary button with the WhatsApp mark. |
+| UI-04 | Done | efe83ef, a23065e | `<ui-save-bar>` (via `shopify.saveBar`) on Settings, Widgets, the template editor and Create discount. In-app links are blocked with a "Leave page?" modal, and `beforeunload` covers closing the tab. |
+| UI-05 | Done | efe83ef, cbdf100 | Setup guide with 5 steps: number · first COD send (or a self-test via `/c/sample`) · hold · return cost · theme embed. It shows "X of 5", can be collapsed (remembered in the browser) and dismissed (saved per shop), and hides itself when complete. Theme status is read with App Bridge `shopify.app.extensions()`, browser-only because no server API exists. The result is stored, and merchants tick the step themselves where App Bridge can't report it. |
+| UI-06 | Done | efe83ef, a7144c2 | The layout loader reads stored settings only. `syncPlan` and `processDueCod` run after the response (plus webhooks and `/cron/cod`). Plan gates stay correct through the subscription webhook and the Plan page's forced check. `shouldRevalidate` stops the layout re-running on every click. Web Vitals go to PostHog as numbers only. |
+| UI-07 | Done | efe83ef | Tokens are now 128-bit (22 characters) on the same short `/c/<token>` path, with no external shortener; older 12-character links keep working until they expire. The confirm page shows the store logo (optional https URL in Settings) or its initial, the address on Free (read-only), and "pay the courier in cash" / "never ask for an OTP" lines. A styled two-step cancel sheet replaces `window.confirm`. |
+| UI-08 | Done | efe83ef | The public page links to the App Store. The store-address form remains only behind `SHOW_LOGIN_FORM=1`, in development, and on `/auth/login`. |
+| UI-09 | Done | a23065e | Send & next stays in the page, not the admin title bar, so it can open WhatsApp from the merchant's own tap. Rows show items, PIN code, order age and risk. Sort by age, value or risk (Pro). Shortcuts: S, J/K, C. Each row has one secondary send button plus a "•••" menu. |
+| UI-10 | Done | efe83ef | Home shows the guide, one Needs attention banner, Today, the ₹-saved headline and a Status card (hold, timers, widgets live, plan). |
+| UI-11 | Done | a23065e | Analytics opens on Returns. |
+| UI-12 | Done | a23065e | `/app/cod/:id` timeline, built from stored order facts and the message log. It has Retry/Dismiss for failed actions and Open in Shopify. |
+| UI-13 | Done | efe83ef, 00d4666 | Shared `ConfirmModal` on native `<dialog>`, portalled to `<body>`, for delete, cancel order, mark cancelled, RTO and cancel Pro. |
+| UI-14 | Done | a23065e, 929ffc0 | 3 tabs plus a "More" menu that never wraps. Send & next sits at the bottom of the screen on phones. s-table switches to a list layout on narrow screens. |
+| UI-15 | Done | a23065e | `/app/templates/:id` and `/app/widgets/discounts/new` each have a breadcrumb. |
+| UI-16 | Done | efe83ef | Settings tabs: Store & WhatsApp · COD rules (Free and Pro together, Pro disabled in place) · Checkouts · Plan. A COD rules card is on the COD page. Sign out removed. |
+| UI-17 | Done | 9a11837, 00d4666, a82ba6f, 945b0cd | Done in this order: `s-page`/`s-section` → `s-banner`/`s-badge`/`s-icon` → `s-table` with pagination (50 per page) and bulk select (COD Mark confirmed / Returned) → Settings form fields. The app stays on **React 18**: fields are uncontrolled, values are read from the fields on save, and checked state is set as a property. AppProvider already loaded Polaris; it is now used. In the embedded admin, App Bridge shows the page heading, breadcrumb and header buttons in the admin title bar; the browser tests' App Bridge stand-in draws an equivalent bar. |
+
+Left as custom UI on purpose: the WhatsApp bubble and phone preview, the widget editor and preview, charts, the setup guide, the template editor's toolbar, and the Create discount form (a mixed amount + unit control).

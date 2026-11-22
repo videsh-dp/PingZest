@@ -83,7 +83,7 @@ store sees it), then reload the app page.
 CI already runs every feature end to end against a fake Shopify (see README → Cloud tests). These are the parts only
 your real store can show, about 10 minutes:
 
-1. **Open the app** from your admin (Apps → PingZest). You see Home and the left sidebar; every link opens its page.
+1. **Open the app** from your admin (Apps → PingZest). You see Home with the setup guide; the PingZest menu in Shopify's left admin menu opens every page.
 2. **Settings:** set the store name and your WhatsApp number, then Save.
 3. **Widgets:** turn on the chat button and press Save. Click **Turn on PingZest in your theme** (opens the theme editor with the
    PingZest embed), save the theme, then open your storefront: the chat button shows.

@@ -109,7 +109,7 @@ jobs:
       - name: Storefront widget tests (browser)
         run: npm run test:widgets
 
-      - name: "End-to-end in the browser: sidebar, every page, settings form, mobile menu, confirm page"
+      - name: "End-to-end in the browser: every page, setup guide, Send & next, modals, save bar, phone layout, confirm page"
         run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e:browser
 
       - name: Screenshots for review (small JPEGs, base64)

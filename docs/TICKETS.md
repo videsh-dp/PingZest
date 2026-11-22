@@ -110,7 +110,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
     - orders with no valid WhatsApp number
     - Shopify actions that failed (tag, hold, release, cancel), with the error
     - shipments in transit for 7+ days with no delivery (stalled)
-  - The sidebar shows an alert badge on Home.
+  - The sidebar shows an alert badge on Home. (Since UI-01 the sidebar is gone: Home's Today list and Needs attention banner carry this.)
   - Failed actions can be retried or dismissed.
   - No external messages (no email or WhatsApp to the merchant).
   - The counting rules are a pure function with unit tests.

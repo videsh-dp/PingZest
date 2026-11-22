@@ -24,17 +24,17 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | Page buttons | "Ask on WhatsApp", "Order on WhatsApp" (cart items + total + cart link), "Share on WhatsApp": styled from the app | Theme app blocks |
 | Storefront | WhatsApp opt-in checkbox on the cart (saved on the order as consent) | – |
 | **Widget analytics** | Views, clicks, click rate per widget; clicks per day (7/30/90 days); mobile vs desktop; by page; discount funnel → orders and sales from your codes | App proxy |
-| **Login** | Merchants sign in with their **Shopify account** (OAuth / token exchange). Public landing + "Log in with Shopify" page, staff name shown, sign-out | – |
-| Admin | Dashboard, setup checklist, one-click theme editor links | – |
-| **Alerts** | Home shows what's stuck, with a red badge on Home in the sidebar: failed Shopify actions (tag / hold / release / cancel, with Retry and Dismiss), COD orders not sent for 12 h+, waiting for a reply past the reminder or expiry time, orders without a valid WhatsApp number, shipments in transit 7+ days. Nothing is sent outside the app | – |
-| Admin | **COD confirmation queue** → Send / Waiting / To remind / Confirmed / Cancelled / No reply | Level 2 customer data |
+| **Login** | Merchants sign in with their **Shopify account** (OAuth / token exchange). The public page links to the App Store (no store-address form in production; `SHOW_LOGIN_FORM=1` brings it back for self-hosted setups); staff name shown in Settings | – |
+| Admin | **Home**: COD-first setup guide (5 steps that tick themselves, theme embed status read from App Bridge, dismissible), Today list, saved-on-returns headline, status card. One admin menu (Shopify's NavMenu, 7 items) and Polaris web components throughout | – |
+| **Alerts** | Home shows what's stuck in one "Needs attention" banner, and the Today list counts the work waiting in each queue: failed Shopify actions (tag / hold / release / cancel, with Retry and Dismiss), COD orders not sent for 12 h+, waiting for a reply past the reminder or expiry time, orders without a valid WhatsApp number, shipments in transit 7+ days. Nothing is sent outside the app | – |
+| Admin | **COD confirmation queue** → To send / Waiting / To remind, plus Confirmed / Cancelled / No reply under More. **Send & next** (opens WhatsApp for the oldest order and moves on), keyboard shortcuts, sort by age / value / risk, bulk Mark confirmed / Returned (RTO), per-order **activity timeline** with Retry and Open in Shopify | Level 2 customer data |
 | **COD follow-up** | Optional **fulfillment hold** on new COD orders, released on confirm; **reminder** list after X hours (own reminder template); **expire** after Y hours with a no-reply tag; one-click **cancel + restock in Shopify** for cancelled / unanswered orders; failed Shopify actions shown on the order with Retry | `write_merchant_managed_fulfillment_orders`, `write_orders` |
 | Admin | Abandoned checkout queue and order updates queue (shipped / delivered) | Level 2 customer data |
 | **Templates** | A built-in Standard template for every stage and language, plus **5 custom templates on the Free plan** (unlimited on Pro), one default per stage and language; formatting toolbar for what typed WhatsApp messages support (bold, italic, strikethrough, monospace, inline code, quote, lists), emoji, variables; phone-style preview rendered like WhatsApp; starter templates | – |
 | Queues | Template picker on each queue: switch templates and the messages update instantly | – |
-| **Saved on returns** | Home, Plan and Analytics → Returns show the money COD confirmation saved: COD orders cancelled or unanswered and not shipped, plus orders paid online, × the merchant's average cost of a returned parcel (Settings → Orders; ₹500 by default for INR stores). "Returned (RTO)" mark on COD orders | – |
+| **Saved on returns** | Home, Plan and Analytics → Returns show the money COD confirmation saved: COD orders cancelled or unanswered and not shipped, plus orders paid online, × the merchant's average cost of a returned parcel (Settings → COD rules; ₹500 by default for INR stores). "Returned (RTO)" mark on COD orders | – |
 | **Message analytics** | Messages sent per day and by stage, COD confirm/cancel rate, median reply time, checkout recovery rate and sales, **template performance** | – |
-| Public | `/c/:token` confirm page: customer taps Confirm/Cancel → order tagged in Shopify | – |
+| Public | `/c/:token` confirm page (128-bit token): store logo or initial, order, delivery address, "pay the courier in cash" and "we never ask for an OTP" lines; Confirm, or Cancel after a second tap → order tagged in Shopify. `/c/sample?shop=…` shows the same page for a made-up order (Home → "Send a test to yourself") | – |
 | **Languages** | Admin in **7 languages** (English, हिन्दी, Español, Português (Brasil), Français, Deutsch, العربية with right-to-left layout). Follows the Shopify admin language, or pick one in Settings. Numbers, money, dates and plurals use the built-in `Intl` library | – |
 | Languages | Storefront widgets speak the **shopper's language**: built-in labels and untouched default texts in all 7 languages, plus your own per-language texts (Widgets → Languages) for every store language | `read_locales` |
 | Languages | Default message templates in all 7 languages; confirm page in the customer's language (message language → browser → shop default) | – |
@@ -73,7 +73,7 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 3. The link shows a preview card that looks like buttons (`public/og-confirm.png`).
 4. The customer taps it and chooses **Confirm** or **Cancel**. The order gets the `wa-cod-confirmed` or
    `wa-cod-cancelled` tag in Shopify, and the queue updates.
-5. **Follow-up** (Settings → Orders → COD follow-up, `app/models/cod-loop.server.js`):
+5. **Follow-up** (Settings → COD rules, `app/models/cod-loop.server.js`):
    - **Hold fulfillment** (opt-in): new COD orders are put on hold in Shopify (`fulfillmentOrderHold`) so nobody
      ships them by mistake; the hold is released when the order is confirmed (customer, merchant or paid online).
    - **To remind**: orders sent more than 24 h ago (setting) without a reply. "Send reminder" opens WhatsApp with the
@@ -138,9 +138,11 @@ Every push runs `.github/workflows/ci.yml` on GitHub (free for public repos):
    The fake checks **every Admin API query and its variables against Shopify's real Admin schema**
    (`scripts/fetch-admin-schema.mjs`), so a wrong field name fails here, not on a merchant's store.
    The same suite runs again on the **Vite dev server** (what `shopify app dev` runs locally).
-5. **Browser end-to-end** (`test/e2e/browser.test.mjs`): Chromium clicks through every page from the left sidebar
-   with a stand-in for App Bridge, saves Settings from the form, checks the phone menu, confirms an order on the
-   confirm page; fails on any page, hydration or console error. Screenshots are kept as a build artifact.
+5. **Browser end-to-end** (`test/e2e/browser.test.mjs`): Chromium opens every page with a stand-in for App Bridge
+   (session token, save bar, theme embed status, and a drawn admin title bar) and the real Polaris web components;
+   checks the setup guide, Today links, COD Send & next, row menus and modals, bulk select, the save bar and its
+   leave guard, the order timeline, the phone layout and the confirm page; fails on any page, hydration or console
+   error. Screenshots are printed in the CI log and kept as a build artifact.
 6. **Browser tests** of the storefront widgets (Playwright + Chromium).
 
 Not covered (needs a real store): Shopify's own screens (the billing approval page, the theme editor) and the
@@ -191,7 +193,7 @@ Prices and features are in `app/lib/plans.js`; Shopify bills the merchant on the
 | **Returns insights**: cancel / no-reply / RTO rates by PIN code, first-time vs repeat buyer, coupon, order hour; confirmed vs unconfirmed RTO; CSV export | – | ✓ |
 | "Powered by PingZest" in the chat popup | shown | hidden |
 
-- **Plan page** (`/app/plan`): compare, start the trial (Shopify's approval page), cancel.
+- **Plan page** (`/app/settings/plan`, under Settings): compare, start the trial (Shopify's approval page), cancel.
 - **Staying in sync:** `app_subscriptions/update` webhook plus a check at most every 10 minutes when the app opens.
   FROZEN (payment failed), cancelled or expired → Free; widgets are re-published so the branding line follows the plan.
 - **Test charges:** on until `BILLING_TEST=false`. Development stores can only approve test charges.
@@ -223,15 +225,33 @@ Shopify's three privacy webhooks are stored in the `ComplianceRequest` collectio
 `status: "done"`. (`pendingDataRequests()` and `markDataRequestSent()` in `app/models/compliance.server.js` are
 ready for an automatic email later.) Redact requests delete the data and are logged as `done`.
 
+## Admin UI (docs/UI-TICKETS.md)
+
+- **One menu:** Shopify's admin menu (`NavMenu`) is the only navigation, 7 items, no icons:
+  COD confirmation · Abandoned checkouts · Order updates · Templates · Widgets · Analytics · Settings.
+  The daily COD work comes first. Discounts live under Widgets (`/app/widgets/discounts`, they feed the
+  discount banner) and Plan under Settings (`/app/settings/plan`); the old URLs redirect. Sub-pages
+  (Plan, Discounts, the template editor, Create discount, an order's activity) have a breadcrumb.
+- **Polaris web components** (`s-page`, `s-section`, `s-banner`, `s-badge`, `s-table`, `s-text-field`,
+  `s-select`, `s-checkbox`…) sit behind the small wrappers in `app/components/ui.jsx`; AppProvider loads
+  Polaris from Shopify's CDN. The app stays on React 18: fields are uncontrolled and read on save.
+  Custom CSS remains for the WhatsApp bubble and phone preview, the widget preview, charts and the setup guide.
+- **Save bar:** Settings, Widgets, the template editor and Create discount use Shopify's save bar
+  (`<ui-save-bar>`), and ask before leaving with unsaved changes. Destructive actions confirm in a modal.
+- **Theme embed status:** Home and Widgets read it in the browser with App Bridge `shopify.app.extensions()`
+  (there is no server-side API) and store the answer; where App Bridge can't tell, the merchant ticks the step.
+- **Speed:** the layout loader only reads stored settings; the plan check and COD autopilot run after the
+  response (and on webhooks and `/cron/cod`), and moving between pages doesn't re-run the layout.
+
 ## How login works
 
 - **Inside Shopify admin** (the normal case): Shopify signs the merchant in automatically with
   token exchange. Installing the app is the first login.
-- **Opening the app URL directly:** a landing page asks for the store address (`your-store`,
-  `your-store.myshopify.com` or an admin URL all work) and sends the merchant to Shopify to sign in or install.
-- **Who's signed in:** online tokens identify the staff member, shown on the dashboard and in Settings → Account.
+- **Opening the app URL directly:** a landing page links to the Shopify App Store (App Store requirement 2.3.1:
+  never ask merchants to type their store address). Self-hosted and development servers can show the
+  store-address form with `SHOW_LOGIN_FORM=1` (always on with `NODE_ENV=development`); `/auth/login` keeps it.
+- **Who's signed in:** online tokens identify the staff member, shown on Home and in Settings → Store & WhatsApp.
   An offline token, stored at install, powers webhooks and the public confirm page.
-- **Sign out** removes that staff member's session; the store's offline token stays.
 
 ## Run it locally
 
@@ -276,7 +296,7 @@ npm test                 # 96 unit tests: phone cleanup, templates (picking, val
                          # (every string translated, placeholders and plurals intact, Intl formatting),
                          # PostHog logging (redaction, batching, flags, request middleware), plan limits
 npm run test:e2e         # end-to-end against a fake Shopify (needs the CI setup: see ci.yml)
-npm run test:e2e:browser # the same in Chromium: sidebar, every page, forms, confirm page
+npm run test:e2e:browser # the same in Chromium: every page, save bar, modals, Send & next, confirm page
 npm run test:widgets     # 20 browser checks of the storefront: designs, mobile, page rules, banner,
                          # copy/apply, tracking, shopper language and right-to-left (needs `npx playwright install chromium`)
 ```
@@ -291,7 +311,7 @@ app/models/         Database + Shopify Admin API helpers (*.server.js)
 app/routes/         app.* = admin pages (widgets, discounts, analytics, cod, carts, updates, templates, settings)
                     webhooks.* · proxy.track · c.$token (public confirm page)
 app/components/     ui.jsx (admin UI kit, WhatsApp bubble, template picker) · fields.jsx (editor controls)
-                    DailyChart.jsx (SVG chart) · Landing.jsx (login page)
+                    DailyChart.jsx (SVG chart) · Landing.jsx (public page)
 extensions/pingzest-widgets/ Theme app extension: app embed (chat + banner) + product/cart/share/opt-in blocks
 prisma/schema.prisma   MongoDB collections: sessions, settings, templates, orders, checkouts, widget counters
 docker-compose.yml     Local MongoDB (one-node replica set)

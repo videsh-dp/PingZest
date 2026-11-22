@@ -33,8 +33,9 @@ npm run dev              # starts the app + a secure tunnel; prints an install l
 ```
 
 Open the install link and pick your development store. That's also how you **log in**: the app uses
-Shopify's own sign-in, so there's no separate password. Anyone opening the app URL directly sees the
-landing page, types their store address and continues to Shopify.
+Shopify's own sign-in, so there's no separate password. On your laptop (`NODE_ENV=development`) the app URL
+also shows a store-address form; in production the public page links to the App Store instead
+(set `SHOW_LOGIN_FORM=1` to keep the form on a self-hosted server).
 
 `npm run dev` keeps running. Leave the terminal open while you test.
 
