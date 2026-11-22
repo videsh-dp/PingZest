@@ -104,6 +104,7 @@ function recorder(label) {
 
   /** Point at an element (outline + cursor) and leave it highlighted for a moment. */
   async function point(page, locator, ms = 1600) {
+    await locator.first().waitFor({ state: "visible", timeout: 15000 }).catch(() => {});
     await locator.first().scrollIntoViewIfNeeded().catch(() => {});
     const box = await locator.first().boundingBox();
     if (!box) throw new Error(`[${label}] nothing to point at: ${locator}`);
@@ -140,6 +141,10 @@ function recorder(label) {
     try {
       await fn(page);
       await beat(page, 800);
+    } catch (e) {
+      mkdirSync("test/e2e/screenshots", { recursive: true });
+      await page.screenshot({ path: `test/e2e/screenshots/demo-fail-${name}.jpg`, type: "jpeg", quality: 50 }).catch(() => {});
+      throw e;
     } finally {
       const video = page.video();
       await context.close();
