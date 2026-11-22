@@ -119,9 +119,9 @@ test("Home setup guide: five COD-first steps that tick themselves, theme embed s
   assert.match(home.html, /data-setup-guide/);
   for (const step of ["number", "firstSend", "hold", "cost", "embed"]) assert.match(home.html, new RegExp(`data-step="${step}"`), `step ${step}`);
   assert.match(home.html, /data-step="embed" data-done="0"/);
-  await act("/app", { intent: "embedStatus", active: "1" });
-  await act("/app", { intent: "holdOn" });
-  assert.equal((await act("/app", { intent: "rtoCost", rtoCost: "550" })).status, 200);
+  await act("/app?index", { intent: "embedStatus", active: "1" });
+  await act("/app?index", { intent: "holdOn" });
+  assert.equal((await act("/app?index", { intent: "rtoCost", rtoCost: "550" })).status, 200);
   const s = await settings();
   assert.equal(s.codHold, true);
   assert.equal(s.rtoCost, 550);
@@ -130,11 +130,11 @@ test("Home setup guide: five COD-first steps that tick themselves, theme embed s
   assert.match(home.html, /data-step="hold" data-done="1"/);
   assert.match(home.html, /data-step="cost" data-done="1"/);
   assert.match(home.html, /Store widgets are live/);
-  await act("/app", { intent: "embedStatus", active: "0" });
+  await act("/app?index", { intent: "embedStatus", active: "0" });
   assert.match((await page("/app")).html, /data-step="embed" data-done="0"/, "embed turned off again");
-  await act("/app", { intent: "dismissSetup" });
+  await act("/app?index", { intent: "dismissSetup" });
   assert.doesNotMatch((await page("/app")).html, /data-setup-guide/, "dismissed");
-  await act("/app", { intent: "showSetup" });
+  await act("/app?index", { intent: "showSetup" });
   assert.match((await page("/app")).html, /data-setup-guide/);
   await prisma.shopSettings.update({ where: { shop: SHOP }, data: { codHold: false, rtoCost: null } });
 });
@@ -188,6 +188,7 @@ test("Templates: seeded, create/update/duplicate/default/delete, and the Free li
   assert.equal(await prisma.messageTemplate.count({ where: { shop: SHOP, seeded: false } }), 5);
   await act("/app/templates", { intent: "create", type: "cod_confirm", lang: "en", name: "Custom 6", body });
   assert.equal(await prisma.messageTemplate.count({ where: { shop: SHOP, seeded: false } }), 5, "6th template refused on Free");
+  assert.match((await page("/app/templates")).html, /data-template-limit/, "Free limit message on the list");
 
   const t = await prisma.messageTemplate.findFirst({ where: { shop: SHOP, name: "Custom 1" } });
   await act("/app/templates", { intent: "duplicate", id: t.id });
@@ -215,7 +216,6 @@ test("Templates: seeded, create/update/duplicate/default/delete, and the Free li
   assert.match(editor.html, /wa-breadcrumb/);
   assertPage(await page("/app/templates/new", { type: "cod_reminder", lang: "hi", from: "standard" }), "new template page");
   assert.equal((await page("/app/templates/000000000000000000000000")).status, 404);
-  assert.match((await page("/app/templates")).html, /data-template-limit/, "Free limit message");
   const viaEditor = await act(`/app/templates/${c2.id}`, { intent: "update", id: c2.id, name: "Custom 2", body: `${body} !`, lang: "en" });
   assert.equal(viaEditor.status, 200);
   assert.ok((await prisma.messageTemplate.findUnique({ where: { id: c2.id } })).body.endsWith("!"), "saved from the editor page");
@@ -318,7 +318,7 @@ test("COD: order webhook → queue → merchant sends → customer confirms on t
   assert.equal((await page("/app/cod/000000000000000000000000")).status, 404);
   for (const sort of ["newest", "value", "risk", "bogus"]) assertPage(await page("/app/cod", { sort }), `COD sorted by ${sort}`);
 
-  const confirm = await fetch(`${BASE}/c/${row.confirmToken}`);
+  const confirm = await fetch(`${BASE}/c/${row.confirmToken}?l=en`);
   assert.equal(confirm.status, 200);
   const html = await confirm.text();
   assert.ok(html.includes(o.name), "confirm page shows the order");
