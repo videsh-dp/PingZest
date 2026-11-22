@@ -164,6 +164,15 @@ const PAGES = [
   ["Plan", "/app/settings/plan"],
 ];
 
+/** Types into a Polaris text field (its input sits in the element's shadow DOM, which Playwright pierces). */
+async function fillField(page, name, value) {
+  const host = page.locator(`[name="${name}"]`).first();
+  const inner = host.locator("input, textarea").first();
+  if (await inner.count()) { await inner.fill(value); return; }
+  await host.fill(value);
+}
+const fieldValue = (page, name) => page.locator(`[name="${name}"]`).first().evaluate((el) => el.value);
+
 const shotName = (path) => path.replace(/\//g, "_").replace(/^_/, "") || "app";
 async function shoot(page, name) {
   if (await page.locator("s-page").count()) await page.locator("#ab-titlebar").waitFor({ timeout: 5000 }).catch(() => {});
@@ -325,7 +334,8 @@ test("Settings: save bar appears on change, guards leaving, saves, and keeps fie
   assert.equal(await bar.count(), 0, "no save bar before changes");
   await page.getByRole("tab", { name: "COD rules" }).click();
   assert.match(page.url(), /tab=cod/);
-  await page.locator('input[name="confirmedTag"]').fill("ui-confirmed");
+  assert.equal(await page.locator('s-text-field[name="confirmedTag"]').count(), 1, "Polaris text field");
+  await fillField(page, "confirmedTag", "ui-confirmed");
   await bar.waitFor();
   assert.deepEqual(await page.evaluate(() => window.__saveBar), { id: "settings-save-bar", open: true }, "App Bridge save bar shown");
   await shoot(page, "settings-save-bar");
@@ -354,18 +364,18 @@ test("Settings: save bar appears on change, guards leaving, saves, and keeps fie
 
   // Store details, and Discard puts the form back.
   await page.getByRole("tab", { name: "Store & WhatsApp" }).click();
-  await page.locator('input[name="storeName"]').fill("Golibar Browser");
-  await page.locator('input[name="whatsappNumber"]').fill("98765 43210");
+  await fillField(page, "storeName", "Golibar Browser");
+  await fillField(page, "whatsappNumber", "98765 43210");
   await bar.getByRole("button", { name: "Save" }).click();
   for (let i = 0; i < 20 && (await prisma.shopSettings.findUnique({ where: { shop: SHOP } }))?.storeName !== "Golibar Browser"; i++) await page.waitForTimeout(250);
   const s = await prisma.shopSettings.findUnique({ where: { shop: SHOP } });
   assert.equal(s.storeName, "Golibar Browser");
   assert.equal(s.whatsappNumber, "919876543210");
   await page.waitForLoadState("networkidle");
-  await page.locator('input[name="storeName"]').fill("Something else");
+  await fillField(page, "storeName", "Something else");
   await bar.waitFor();
   await bar.getByRole("button", { name: "Discard" }).click();
-  assert.equal(await page.locator('input[name="storeName"]').inputValue(), "Golibar Browser", "discarded");
+  assert.equal(await fieldValue(page, "storeName"), "Golibar Browser", "discarded");
   assert.deepEqual(problems, [], "no errors while saving");
   await page.context().close();
 });

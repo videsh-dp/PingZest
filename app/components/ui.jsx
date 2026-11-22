@@ -603,38 +603,98 @@ export function SaveBar({ id, dirty, saving = false, onSave, onDiscard, saveDisa
   );
 }
 
+/* ---------- Form fields on Polaris web components (uncontrolled: React 18 can't drive them as controlled) ---------- */
+
+const POLARIS_FIELDS = "s-text-field, s-number-field, s-url-field, s-email-field, s-select, s-checkbox, s-switch, s-text-area";
+const isToggle = (el) => el.tagName === "S-CHECKBOX" || el.tagName === "S-SWITCH" || el.type === "checkbox" || el.type === "radio";
+// Before a Polaris element upgrades its value lives only in the attribute.
+const valueOf = (el) => String(el.value ?? el.getAttribute?.("value") ?? "");
+const checkedOf = (el) => Boolean(el.checked ?? el.hasAttribute?.("checked"));
+
+/** Every named field of a form: native inputs and Polaris fields, enabled ones only. */
+function formFields(form) {
+  const out = [];
+  const seen = new Set();
+  for (const el of [...form.elements, ...form.querySelectorAll(POLARIS_FIELDS)]) {
+    const name = el.getAttribute?.("name") || el.name;
+    if (!name || seen.has(el) || el.type === "hidden" || el.disabled || el.hasAttribute?.("disabled") || el.closest?.("fieldset[disabled]")) continue;
+    seen.add(el);
+    out.push(el);
+  }
+  return out;
+}
+
+/**
+ * The form's values as FormData, read from the fields themselves, so Polaris fields count whether or not
+ * the browser includes them in the form (hidden inputs are kept as they are).
+ */
+export function formValues(form) {
+  const fd = new FormData();
+  for (const el of form.querySelectorAll('input[type="hidden"][name]')) if (!el.disabled) fd.append(el.name, el.value);
+  for (const el of formFields(form)) {
+    const name = el.getAttribute?.("name") || el.name;
+    if (isToggle(el)) { if (checkedOf(el)) fd.set(name, "on"); } else fd.set(name, valueOf(el));
+  }
+  return fd;
+}
+
 /**
  * Unsaved-changes tracking for an uncontrolled <form>: compares the form's current values with the values
  * it had when it was last loaded or saved (`savedKey` changes after a save). Returns [dirty, discard].
  */
 export function useFormDirty(formRef, savedKey) {
   const [dirty, setDirty] = useState(false);
-  const snap = useRef("");
+  const snap = useRef({ text: "", values: [] });
   const read = () => {
     const f = formRef.current;
-    if (!f) return "";
-    const pairs = [];
-    for (const el of f.elements) {
-      if (!el.name || el.type === "hidden" || el.disabled) continue;
-      pairs.push(`${el.name}=${el.type === "checkbox" || el.type === "radio" ? el.checked : el.value}`);
-    }
-    return pairs.join("&");
+    if (!f) return { text: "", values: [] };
+    const values = formFields(f).map((el) => [el, isToggle(el) ? checkedOf(el) : valueOf(el)]);
+    return { text: values.map(([el, v]) => `${el.getAttribute?.("name") || el.name}=${v}`).join("&"), values };
   };
   useEffect(() => {
-    snap.current = read();
-    setDirty(false);
     const f = formRef.current;
     if (!f) return undefined;
-    const check = () => setDirty(read() !== snap.current);
-    f.addEventListener("input", check);
-    f.addEventListener("change", check);
-    return () => { f.removeEventListener("input", check); f.removeEventListener("change", check); };
+    // Polaris fields upgrade after hydration: take the snapshot once they are ready.
+    const take = () => { snap.current = read(); setDirty(false); };
+    take();
+    const t = setTimeout(take, 300);
+    const check = () => setDirty(read().text !== snap.current.text);
+    f.addEventListener("input", check, true);
+    f.addEventListener("change", check, true);
+    return () => { clearTimeout(t); f.removeEventListener("input", check, true); f.removeEventListener("change", check, true); };
   }, [savedKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const discard = () => {
     formRef.current?.reset();
+    for (const [el, v] of snap.current.values) { if (isToggle(el)) el.checked = v; else el.value = v; }
     setDirty(false);
   };
   return [dirty, discard];
+}
+
+/** Polaris text field (s-text-field / s-number-field / s-url-field). */
+export function TextField({ label, name, defaultValue, help, error, type = "text", disabled, placeholder, maxLength, min, max, step, required, inputMode }) {
+  const tr = useT();
+  const common = {
+    label, name, details: help, error: error ? tr(error) : undefined, placeholder,
+    value: defaultValue == null ? "" : String(defaultValue), disabled: flag(disabled), required: flag(required),
+  };
+  if (type === "number") return <s-number-field {...common} min={min} max={max} step={step} inputMode={inputMode} />;
+  if (type === "url") return <s-url-field {...common} maxLength={maxLength} />;
+  return <s-text-field {...common} maxLength={maxLength} inputMode={inputMode} />;
+}
+
+/** Polaris select. options: [[value, label]] */
+export function SelectField({ label, name, defaultValue, options, help, disabled }) {
+  return (
+    <s-select label={label} name={name} value={defaultValue} details={help} disabled={flag(disabled)}>
+      {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+    </s-select>
+  );
+}
+
+/** Polaris checkbox. */
+export function CheckboxField({ label, name, defaultChecked, help, disabled }) {
+  return <s-checkbox label={label} name={name} checked={flag(defaultChecked)} details={help} disabled={flag(disabled)} />;
 }
 
 export function MessagePreview({ message, missing = [], warning }) {
