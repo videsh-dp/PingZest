@@ -144,10 +144,11 @@ test("FREE plan walkthrough", async () => {
   await fill("whatsappNumber", "98200 12345");
   await page.getByRole("tab", { name: "COD rules" }).click();
   await settle(page);
-  const hold = page.locator('s-checkbox[name="codHold"]');
-  await mark(hold);
+  const hold = page.locator('s-checkbox[name="codHold"] input').first();
+  const holdLabel = page.locator('s-checkbox[name="codHold"] label').first();
+  await mark((await holdLabel.count()) ? holdLabel : hold);
   await F("settings-cod-rules", "Settings: COD rules", "Hold fulfillment until the customer confirms, plus reminder and expiry timers and the tags added in Shopify.");
-  await hold.click();
+  await hold.click({ force: true });
   await page.locator('ui-save-bar[data-open="true"]').waitFor();
   await mark(page.locator('ui-save-bar button[variant="primary"]'));
   await F("settings-save-bar", "Unsaved changes", "Shopify's save bar appears as soon as something changes; leaving asks first.");
