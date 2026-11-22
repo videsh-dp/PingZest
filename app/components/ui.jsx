@@ -658,7 +658,9 @@ export function useFormDirty(formRef, savedKey) {
     const take = () => { snap.current = read(); setDirty(false); };
     take();
     const t = setTimeout(take, 300);
-    const check = () => setDirty(read().text !== snap.current.text);
+    // Listen in the capture phase (Polaris fields may not bubble their events) and read after the field
+    // has handled the event and updated its value.
+    const check = () => setTimeout(() => setDirty(read().text !== snap.current.text), 0);
     f.addEventListener("input", check, true);
     f.addEventListener("change", check, true);
     return () => { clearTimeout(t); f.removeEventListener("input", check, true); f.removeEventListener("change", check, true); };
