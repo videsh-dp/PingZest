@@ -8,4 +8,3 @@ test/widgets/*.png
 .react-router
 shopify.app.ngrok*.toml
 test/e2e/screenshots/
-test/e2e/demo/
