@@ -138,9 +138,9 @@ test("FREE plan walkthrough", async () => {
   await F("home-setup-guide", "Home", "The setup guide puts COD confirmation first, and Today lists the work waiting in each queue.");
 
   await go(page, "/app/settings");
-  await mark(page.locator('[name="whatsappNumber"]'));
+  await mark(page.locator('s-text-field[name="whatsappNumber"]'));
   await F("settings-store", "Settings: store and WhatsApp", "Settings are grouped by job; the WhatsApp number is the one the merchant sends from.");
-  const fill = async (name, value) => { const inner = page.locator(`[name="${name}"]`).locator("input").first(); if (await inner.count()) await inner.fill(value); else await page.locator(`[name="${name}"]`).fill(value); };
+  const fill = async (name, value) => { const inner = page.locator(`s-text-field[name="${name}"] input`).first(); if (await inner.count()) await inner.fill(value); else await page.locator(`input[name="${name}"]`).first().fill(value); };
   await fill("whatsappNumber", "98200 12345");
   await page.getByRole("tab", { name: "COD rules" }).click();
   await settle(page);
@@ -268,7 +268,7 @@ test("PRO plan walkthrough", async () => {
   });
   await go(page, "/app/settings", { tab: "cod" });
   await page.getByRole("heading", { name: /COD money-savers/ }).first().scrollIntoViewIfNeeded().catch(() => {});
-  await page.locator('[name="prepaidEnabled"]').scrollIntoViewIfNeeded();
+  await page.locator('s-checkbox[name="prepaidEnabled"]').scrollIntoViewIfNeeded();
   await P("settings-money-savers", "COD money-savers", "Pro turns on the risk tag, pay-online-with-a-discount, the address check and the autopilot.");
 
   // A new risky order arrives on Pro.
