@@ -43,6 +43,47 @@ async function newPage({ mobile = false } = {}) {
       // The PingZest app embed is on in the live theme (what Shopify reports for a set-up store).
       app: { extensions: async () => [{ handle: "pingzest-widgets", type: "theme_app_extension", activations: [{ target: "body", handle: "app-embed", name: "PingZest", status: "active", activations: [] }] }] },
     };
+    // Shopify's admin title bar: App Bridge shows the s-page heading, breadcrumb and header buttons above
+    // the app (Polaris hides them inside the iframe). The stand-in draws the same bar at the top of the page;
+    // its buttons click the app's own elements, like App Bridge does.
+    const drawTitleBar = () => {
+      const pageEl = document.querySelector("s-page");
+      let bar = document.getElementById("ab-titlebar");
+      if (!pageEl) { bar?.remove(); return; }
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "ab-titlebar";
+        bar.style.cssText = "position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:8px;padding:10px 16px;background:#ebebeb;border-bottom:1px solid #d4d4d4;font:600 14px -apple-system,Segoe UI,Roboto,sans-serif;color:#303030";
+        document.body.prepend(bar);
+      }
+      const items = [...pageEl.querySelectorAll(':scope > [slot="breadcrumb-actions"], :scope > [slot="primary-action"], :scope > [slot="secondary-actions"]')];
+      const key = pageEl.getAttribute("heading") + "|" + items.map((i) => i.slot + i.textContent + i.getAttribute("href")).join("|");
+      if (bar.dataset.key === key) return;
+      bar.dataset.key = key;
+      bar.textContent = "";
+      const proxy = (el, style) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = el.textContent.trim();
+        b.dataset.proxy = el.slot;
+        b.style.cssText = style;
+        b.addEventListener("click", () => el.click());
+        return b;
+      };
+      for (const el of items.filter((i) => i.slot === "breadcrumb-actions")) {
+        const b = proxy(el, "border:0;background:none;color:#616161;font:inherit;cursor:pointer;padding:0");
+        b.textContent = `${b.textContent} ›`;
+        bar.append(b);
+      }
+      const h = document.createElement("span");
+      h.textContent = pageEl.getAttribute("heading") || "";
+      h.dataset.heading = "";
+      h.style.cssText = "flex:1";
+      bar.append(h);
+      for (const el of items.filter((i) => i.slot === "secondary-actions")) bar.append(proxy(el, "border:1px solid #c9c9c9;background:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer"));
+      for (const el of items.filter((i) => i.slot === "primary-action")) bar.append(proxy(el, "border:0;background:#303030;color:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer"));
+    };
+    new MutationObserver(() => drawTitleBar()).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["heading", "href"] });
     const original = window.fetch.bind(window);
     window.fetch = async (input, init = {}) => {
       const url = new URL(typeof input === "string" ? input : input.url, location.href);
@@ -60,10 +101,8 @@ async function newPage({ mobile = false } = {}) {
   // screenshots show real Polaris rendering.
   await context.route("https://cdn.shopify.com/**", (route) => {
     const u = route.request().url();
-    if (/polaris/.test(u)) return route.continue();
-    if (u.endsWith(".js")) return route.fulfill({ status: 200, contentType: "application/javascript", body: "/* stubbed in e2e */" });
-    if (u.endsWith(".css")) return route.fulfill({ status: 200, contentType: "text/css", body: "" });
-    return route.abort();
+    if (/app-bridge\.js/.test(u)) return route.fulfill({ status: 200, contentType: "application/javascript", body: "/* App Bridge stubbed in e2e */" });
+    return route.continue();
   });
   const page = await context.newPage();
   page.on("pageerror", (e) => problems.push(`${page.url()} pageerror: ${e.message}`));
@@ -145,7 +184,7 @@ test("every page opens without errors; no second menu inside the app", async () 
   }
   // Sub-pages have a breadcrumb back to their menu item.
   await page.goto(app.adminUrl("/app/settings/plan"), { waitUntil: "networkidle" });
-  await page.locator('s-link[slot="breadcrumb-actions"]').click();
+  await page.locator('#ab-titlebar [data-proxy="breadcrumb-actions"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/settings");
   assert.deepEqual(problems, [], "no page, hydration or console errors");
   await page.context().close();
@@ -211,15 +250,16 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   await page.waitForLoadState("networkidle");
 
   // Send & next: one primary button opens WhatsApp for the oldest order and records it.
-  const next = page.locator("s-button[data-send-next]");
+  const next = page.locator("a[data-send-next]");
   const firstId = await next.getAttribute("data-send-next");
   const [popup] = await Promise.all([page.waitForEvent("popup"), next.click()]);
   await popup.close();
   await page.locator("[data-run-progress]").waitFor();
+  assert.match(await page.locator("[data-run-progress]").innerText(), /1 sent in this run/);
   for (let i = 0; i < 20 && !(await prisma.order.findUnique({ where: { id: firstId } })).codSentAt; i++) await page.waitForTimeout(250);
   assert.ok((await prisma.order.findUnique({ where: { id: firstId } })).codSentAt, "first order marked sent");
   await page.waitForLoadState("networkidle");
-  const secondId = await page.locator("s-button[data-send-next]").getAttribute("data-send-next");
+  const secondId = await page.locator("a[data-send-next]").getAttribute("data-send-next");
   assert.notEqual(secondId, firstId, "moves on to the next order");
   await shoot(page, "cod-send-next");
 
@@ -252,7 +292,7 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   assert.ok(events.includes("sent"), `timeline shows the send (${events})`);
   assert.ok(await page.locator("s-button[data-open-shopify]").count(), "Open in Shopify");
   await shoot(page, "cod-timeline");
-  await page.locator('s-link[slot="breadcrumb-actions"]').click();
+  await page.locator('#ab-titlebar [data-proxy="breadcrumb-actions"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/cod");
   assert.deepEqual(problems, []);
   await page.context().close();
@@ -335,7 +375,7 @@ test("Widgets, templates and discounts use the save bar; editors are pages with 
   await page.locator("dialog[open]").getByRole("button", { name: "Cancel" }).click();
 
   await page.goto(app.adminUrl("/app/widgets/discounts"), { waitUntil: "networkidle" });
-  await page.locator('s-button[slot="primary-action"]').click();
+  await page.locator('#ab-titlebar [data-proxy="primary-action"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/widgets/discounts/new");
   await page.waitForLoadState("networkidle");
   await page.locator('input[name="code"]').fill("BROWSER15");
@@ -358,7 +398,7 @@ test("on a phone: no menu button, tabs on one line, Send & next within thumb rea
   await page.goto(app.adminUrl("/app/cod"), { waitUntil: "networkidle" });
   const tabs = await page.locator(".wa-tabs").boundingBox();
   assert.ok(tabs.height < 60, `tabs stay on one line (${tabs.height}px)`);
-  const send = page.locator("s-button[data-send-next]");
+  const send = page.locator("a[data-send-next]");
   if (await send.count()) {
     const box = await send.boundingBox();
     assert.ok(box.y + box.height > 844 - 80, `Send & next at the bottom (${box.y})`);

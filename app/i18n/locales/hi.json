@@ -790,5 +790,6 @@
   "Send {count} shipping or delivery update|Send {count} shipping or delivery updates": {
     "one": "{count} शिपिंग या डिलीवरी अपडेट भेजें",
     "other": "{count} शिपिंग या डिलीवरी अपडेट भेजें"
-  }
+  },
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "सबसे पुराने ऑर्डर के लिए WhatsApp खोलता है, फिर अगले पर जाता है।"
 }

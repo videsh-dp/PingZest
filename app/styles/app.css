@@ -605,3 +605,8 @@ s-page:not(:defined) > [slot] { display: none; }
 s-banner { display: block; margin-bottom: 16px; }
 ui-save-bar:not(:defined)[data-open="true"] { margin: 16px 0 0; }
 .wa-search__icon s-icon { display: block; }
+.wa-runbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; }
+@media (max-width: 760px) {
+  .wa-runbar .wa-sendnext { position: fixed; z-index: 15; inset-inline: 12px; bottom: 12px; min-height: 48px; font-size: 15px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); }
+  s-page.wa-page:has(.wa-sendnext) { padding-bottom: 84px; }
+}

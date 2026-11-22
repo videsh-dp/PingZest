@@ -818,5 +818,6 @@
     "few": "أرسل {count} تحديثات شحن أو توصيل",
     "many": "أرسل {count} تحديثًا للشحن أو التوصيل",
     "other": "أرسل {count} تحديث شحن أو توصيل"
-  }
+  },
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "يفتح WhatsApp لأقدم طلب، ثم ينتقل إلى التالي."
 }

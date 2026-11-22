@@ -791,5 +791,6 @@
   "Send {count} shipping or delivery update|Send {count} shipping or delivery updates": {
     "one": "Envía {count} aviso de envío o entrega",
     "other": "Envía {count} avisos de envío o entrega"
-  }
+  },
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "Abre WhatsApp con el pedido más antiguo y pasa al siguiente."
 }

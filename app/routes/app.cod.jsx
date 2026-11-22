@@ -21,7 +21,7 @@ import { toId } from "../lib/ids.js";
 import { N_ } from "../i18n/core.js";
 import {
   Page, Card, Banner, Tabs, StatusBadge, Badge, SendButton, ActionButton, ActionMenu, MessagePreview, EmptyState,
-  useQueueTemplate, ListView, SendWith,
+  useQueueTemplate, ListView, SendWith, WhatsAppIcon,
 } from "../components/ui";
 
 export const loader = async ({ request }) => {
@@ -241,16 +241,27 @@ export default function CodQueue() {
     if (selected) document.querySelector(`[data-row="${selected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [selected]);
 
-  const sendNextAction = runMode && next ? {
-    label: reminding ? tr("Remind next: {order}", { order: next.orderName }) : tr("Send next: {order}", { order: next.orderName }),
-    href: next.link,
-    target: "_blank",
-    onClick: recordNext,
-    className: "wa-sendnext",
-    "data-send-next": next.id,
-    "aria-keyshortcuts": "S",
-  } : undefined;
-  const allSent = runMode && !next && list.length > 0;
+  // In the page, not the admin's title bar: it has to open WhatsApp straight from the merchant's tap.
+  const runBar = runMode && list.length > 0 && (
+    <div className="wa-runbar" data-runbar>
+      {next ? (
+        <a
+          href={next.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="wa-button wa-button--primary wa-sendnext"
+          onClick={recordNext}
+          data-send-next={next.id}
+          aria-keyshortcuts="S"
+        >
+          <WhatsAppIcon /> {reminding ? tr("Remind next: {order}", { order: next.orderName }) : tr("Send next: {order}", { order: next.orderName })}
+        </a>
+      ) : <span className="wa-muted" data-send-next="done">{tr("Everything in this list is sent")}</span>}
+      <span className="wa-muted wa-small" data-run-progress={sentCount > 0 ? "" : undefined}>
+        {sentCount > 0 ? tr("{sent} sent in this run · {left} left", { sent: sentCount, left: remaining }) : tr("Opens WhatsApp for the oldest order, then moves to the next one.")}
+      </span>
+    </div>
+  );
 
   const columns = [
     {
@@ -360,8 +371,7 @@ export default function CodQueue() {
       size="large"
       title={tr("COD confirmation")}
       subtitle={tr("Confirm Cash on Delivery orders before you ship. Customers tap the link in the message to confirm or cancel.")}
-      primaryAction={sendNextAction}
-      actions={allSent ? <span className="wa-muted" data-send-next="done">{tr("Everything in this list is sent")}</span> : null}
+
       tabs={<Tabs tabs={tabs} label={tr("COD orders")} main={COD_MAIN_TABS} />}
     >
       {pro ? null : teaser?.high > 0 ? (
@@ -371,11 +381,7 @@ export default function CodQueue() {
         </Banner>
       ) : null}
 
-      {runMode && sentCount > 0 && (
-        <p className="wa-run" role="status" data-run-progress>
-          {tr("{sent} sent in this run · {left} left", { sent: sentCount, left: remaining })}
-        </p>
-      )}
+      {runBar}
 
       <Card className="wa-card--list">
         <ListView
