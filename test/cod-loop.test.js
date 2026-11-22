@@ -89,3 +89,32 @@ test("database filters use the same timers", () => {
   assert.equal(e.codSentAt.lte.getTime(), now - 72 * H);
   assert.equal(e.convertedToPrepaid, false);
 });
+
+test("COD queue: sorting and Send & next", async () => {
+  const { sortCodRows, nextToSend } = await import("../app/lib/cod-filters.js");
+  const rows = [
+    { id: "a", createdAt: "2026-11-20T10:00:00Z", totalPrice: "500", riskScore: 10, link: "x" },
+    { id: "b", createdAt: "2026-11-19T10:00:00Z", totalPrice: "2500", riskScore: 80, link: null },
+    { id: "c", createdAt: "2026-11-21T10:00:00Z", totalPrice: "900", riskScore: null, link: "y" },
+  ];
+  assert.deepEqual(sortCodRows(rows).map((r) => r.id), ["b", "a", "c"]);
+  assert.deepEqual(sortCodRows(rows, "newest").map((r) => r.id), ["c", "a", "b"]);
+  assert.deepEqual(sortCodRows(rows, "value").map((r) => r.id), ["b", "c", "a"]);
+  assert.deepEqual(sortCodRows(rows, "risk").map((r) => r.id), ["b", "a", "c"]);
+  assert.equal(nextToSend(sortCodRows(rows)).id, "a", "skips rows without a WhatsApp link");
+  assert.equal(nextToSend(sortCodRows(rows), new Set(["a"])).id, "c");
+  assert.equal(nextToSend(rows, new Set(["a", "c"])), null);
+});
+
+test("order timeline from stored facts, oldest first", async () => {
+  const { buildTimeline } = await import("../app/lib/timeline.js");
+  const t = buildTimeline({
+    createdAt: "2026-11-20T10:00:00Z", heldAt: "2026-11-20T10:00:01Z", codSentAt: "2026-11-20T11:00:00Z",
+    codStatus: "confirmed", codRespondedAt: "2026-11-20T12:00:00Z", codRespondedBy: "customer", holdReleasedAt: "2026-11-20T12:00:02Z",
+    actionError: "tag: Access denied", actionErrorAt: "2026-11-20T12:00:03Z",
+  }, [{ kind: "cod_confirm", sentAt: "2026-11-20T11:00:00Z", templateName: "Short" }]);
+  assert.deepEqual(t.map((e) => e.kind), ["created", "held", "sent", "confirmed", "released", "error"]);
+  assert.equal(t[2].vars.template, "Short");
+  assert.equal(t[3].by, "customer");
+  assert.equal(t[5].vars.message, "Access denied");
+});

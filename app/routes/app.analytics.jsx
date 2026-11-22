@@ -197,7 +197,7 @@ function ReturnsView({ r, pro }) {
 
       {!pro ? (
         <Card title={tr("Where returns come from")}>
-          <EmptyState icon="🔒" title={tr("Returns insights are on Pro")} action={<Link className="wa-button wa-button--primary" to="/app/plan">{tr("See Pro")}</Link>}>
+          <EmptyState title={tr("Returns insights are on Pro")} action={<Link className="wa-button wa-button--primary" to="/app/settings/plan">{tr("See Pro")}</Link>}>
             {tr("See cancel, no-reply and return rates by PIN code, first-time vs repeat buyers, coupon use and order time, and whether confirmed orders come back less often. Export to CSV.")}
           </EmptyState>
         </Card>
@@ -245,7 +245,8 @@ export default function Analytics() {
   const money = tr.money;
   const a = useLoaderData();
   const [params] = useSearchParams();
-  const view = ["widgets", "returns"].includes(params.get("view")) ? params.get("view") : "messages";
+  // Opens on Returns: what COD confirmation saved, the number that matters most.
+  const view = ["widgets", "messages"].includes(params.get("view")) ? params.get("view") : "returns";
   const t = a.totals;
   const interactions = (w) => (w ? w.click + w.copy + w.apply : 0);
   const totalViews = Object.values(t).reduce((s, w) => s + w.view, 0);
@@ -257,11 +258,12 @@ export default function Analytics() {
 
   return (
     <Page
+      size="large"
       title={tr("Analytics")}
-      subtitle={tr("Messages you send, what COD confirmation saved you, and how shoppers use your widgets. Widget numbers are daily totals only: no cookies or personal data.")}
+      subtitle={tr("What COD confirmation saved you, the messages you send, and how shoppers use your widgets. Widget numbers are daily totals only: no cookies or personal data.")}
       tabs={
         <div className="wa-row-between wa-tabs-row">
-          <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "messages", label: tr("Messages") }, { id: "returns", label: tr("Returns") }, { id: "widgets", label: tr("Widgets") }]} />
+          <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "returns", label: tr("Returns") }, { id: "messages", label: tr("Messages") }, { id: "widgets", label: tr("Widgets") }]} />
           <Tabs param="days" variant="segmented" label={tr("Date range")} tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
         </div>
       }
