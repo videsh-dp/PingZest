@@ -64,7 +64,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Pure calculation with unit tests.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** none.
-- **Status:** Done (commit "Returns: saved on returns…").
+- **Status:** Done (542c323).
 
 ### PZ-05 · RTO breakdowns (Pro)
 - **Problem:** a single RTO % hides the patterns. Merchants want cuts by pincode, first-time buyer, coupon and order hour, and confirmed vs unconfirmed RTO (R1 §1 job 2; R2 Move 2).
@@ -83,7 +83,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Free sees a locked card with an upgrade link. No breakdown data is sent to the page on Free.
 - **Plan:** Free headline / Pro breakdowns. **Effort:** M.
 - **Dependencies:** PZ-04. True delivery outcome comes from the manual mark. Courier integration is PZ-25.
-- **Status:** Done (commit "Returns: saved on returns…").
+- **Status:** Done (542c323).
 
 ### PZ-06 · Value framing on the Plan page
 - **Problem:** "Pays for itself after 2 saved RTOs" is the pitch. The feature list doesn't say it (R2 §5.4; R1 §3).
@@ -94,7 +94,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Prices and plan structure are unchanged.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-04.
-- **Status:** Done (commit "Returns: saved on returns…").
+- **Status:** Done (542c323).
 
 ### PZ-07 · Alerts for stuck work
 - **Problem:** silent failures are churn cause #2: "automations stop and nobody notices" (R1 §2 item 2; R2 Move 7; R2 §3 weak spot 1).
@@ -111,7 +111,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - The counting rules are a pure function with unit tests.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-01 and PZ-03 for the action errors.
-- **Status:** To do.
+- **Status:** Done (commit "Alerts for stuck work…").
 
 ### PZ-08 · Phone-number health on the COD queue
 - **Problem:** in R1 §1 job 8, half the broadcasts failed because of missing country codes.
@@ -120,7 +120,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Counted in PZ-07.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-07.
-- **Status:** To do.
+- **Status:** Done (commit "Alerts for stuck work…").
 
 ### PZ-09 · In-app review ask after the first savings milestone
 - **Problem:** reviews drive ranking against the new COD apps, which have 0 reviews (R2 Move 6).

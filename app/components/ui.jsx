@@ -273,11 +273,12 @@ export function SendButton({ link, intent, id, extra = {}, label, disabled }) {
   );
 }
 
-export function ActionButton({ intent, id, extra = {}, children, tone = "secondary", confirmText }) {
+export function ActionButton({ intent, id, extra = {}, children, tone = "secondary", confirmText, action }) {
   const fetcher = useFetcher();
   return (
     <fetcher.Form
       method="post"
+      action={action}
       onSubmit={(e) => { if (confirmText && !window.confirm(confirmText)) e.preventDefault(); }}
     >
       <input type="hidden" name="intent" value={intent} />

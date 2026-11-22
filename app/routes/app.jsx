@@ -8,6 +8,7 @@ import { staffName } from "../lib/shop.js";
 import { syncPlan } from "../models/billing.server";
 import { navCounts } from "../models/orders.server";
 import { processDueCod } from "../models/cod-loop.server";
+import { shopAlerts } from "../models/alerts.server";
 import { NAV_SECTIONS, NAV_ITEMS } from "../lib/nav.js";
 import { adminLocale, dictionaryFor } from "../i18n/server.js";
 import { I18nProvider, useT } from "../i18n/react.jsx";
@@ -28,10 +29,12 @@ export const loader = async ({ request }) => {
   identifyShop(session.shop, profile);
   // Pro autopilot: expire unanswered COD orders that are due (throttled to every 10 minutes per shop).
   await processDueCod(session.shop, admin, { limit: 20 }).catch((e) => console.error("COD autopilot failed", e?.message));
-  const [flags, counts] = await Promise.all([
+  const [flags, queueCounts, alerts] = await Promise.all([
     getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } }),
     navCounts(session.shop, { delayMin: settings.abandonDelayMin, settings }).catch(() => ({})),
+    shopAlerts(session.shop, settings).catch(() => ({ total: 0 })),
   ]);
+  const counts = { ...queueCounts, alerts: alerts.total };
   return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan, counts };
 };
 
@@ -98,7 +101,12 @@ function Sidebar({ plan, counts }) {
                     <span className="wa-sidebar__icon" aria-hidden="true">{i.icon}</span>
                     <span className="wa-sidebar__label">{tr(i.label)}</span>
                     {i.badge && counts[i.badge] > 0 ? (
-                      <span className="wa-sidebar__badge" aria-label={tr("{count} to send", { count: counts[i.badge] })}>{counts[i.badge] > 99 ? "99+" : counts[i.badge]}</span>
+                      <span
+                        className={`wa-sidebar__badge${i.badge === "alerts" ? " wa-sidebar__badge--alert" : ""}`}
+                        aria-label={i.badge === "alerts" ? tr("{count} need attention", { count: counts[i.badge] }) : tr("{count} to send", { count: counts[i.badge] })}
+                      >
+                        {counts[i.badge] > 99 ? "99+" : counts[i.badge]}
+                      </span>
                     ) : null}
                   </NavLink>
                 </li>

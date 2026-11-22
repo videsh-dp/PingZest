@@ -477,3 +477,8 @@ ui-nav-menu { display: none !important; }
 /* Narrow panels (Widgets editor): wrap tabs instead of hiding some off to the side */
 .wa-editor-panel .wa-tabs { flex-wrap: wrap; overflow: visible; }
 .wa-value__headline { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
+.wa-sidebar__badge--alert, .wa-sidebar__link.is-active .wa-sidebar__badge--alert { background: var(--wa-critical); }
+.wa-alerts { margin: 6px 0 0; padding-inline-start: 18px; }
+.wa-alerts li { margin: 2px 0; }
+.wa-alert-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid #eee; }
+.wa-alert-row:first-of-type { border-top: 0; }

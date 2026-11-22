@@ -185,6 +185,11 @@ export default function CodQueue() {
         <>
           {r.customerName || "—"}
           <div className="wa-muted">{r.phoneDisplay ? <bdi dir="ltr">{r.phoneDisplay}</bdi> : tr("No phone")}{r.optIn ? ` · ${tr("opted in")}` : ""}</div>
+          {!r.phoneDisplay && (
+            <div className="wa-warn wa-small">
+              {tr("No valid WhatsApp number on this order. Call the customer, or check the default country code in")} <Link to="/app/settings">{tr("Settings")}</Link>.
+            </div>
+          )}
           <MessagePreview message={r.message} missing={r.missing} warning={r.warning} />
         </>
       ),

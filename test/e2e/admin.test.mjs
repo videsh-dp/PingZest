@@ -416,6 +416,56 @@ test("Returns (Free): order facts saved, return cost setting, saved-on-returns h
   assert.match(plan.html, /saved you about/, "store's own savings on the Plan page");
 });
 
+
+/* ---------- alerts for stuck work (PZ-07, PZ-08) ---------- */
+
+test("Alerts: failed Shopify action, unsent and phoneless COD orders, stalled shipment → Home banner + badge; Retry and Mark delivered clear them", async () => {
+  // A tag that Shopify refuses.
+  const { o, row } = await sentCodOrder(1);
+  shopify.state.failNext = "tagOrder";
+  await act("/app/cod", { intent: "status", id: row.id, status: "confirmed" });
+  assert.match((await orderRow(o)).actionError || "", /^tag: /, "failed tag recorded");
+
+  // Not sent for 13 hours, and an order without any phone.
+  const late = codOrder();
+  await webhook("/webhooks/orders", "orders/create", late);
+  await prisma.order.update({ where: { id: (await orderRow(late)).id }, data: { createdAt: new Date(Date.now() - 13 * HOUR) } });
+  const nophone = codOrder({ phone: null, customer: { first_name: "Nobody" }, shipping_address: { first_name: "Nobody", address1: "12 Park Street", city: "Delhi", zip: "110001", country_code: "IN" } });
+  await webhook("/webhooks/orders", "orders/create", nophone);
+  assert.equal((await orderRow(nophone)).phone, null);
+
+  // Shipped 8 days ago, never delivered.
+  const shipped = codOrder({ payment_gateway_names: ["Razorpay"] });
+  await webhook("/webhooks/orders", "orders/create", shipped);
+  await webhook("/webhooks/fulfillments", "fulfillments/create", { id: 99001, order_id: shipped.id, status: "success", tracking_url: "https://track.example/AWB7", tracking_urls: ["https://track.example/AWB7"], tracking_number: "AWB7", tracking_company: "Delhivery" });
+  const shippedRow = await orderRow(shipped);
+  await prisma.order.update({ where: { id: shippedRow.id }, data: { shippedAt: new Date(Date.now() - 8 * 24 * HOUR) } });
+
+  const home = await page("/app");
+  assertPage(home, "home with alerts");
+  assert.match(home.html, /Needs attention/);
+  assert.match(home.html, /data-alert="failed"/);
+  assert.match(home.html, /Couldn(?:'|&#x27;|&#39;)t tag the order/);
+  assert.match(home.html, /data-alert="notSent"/);
+  assert.match(home.html, /data-alert="noPhone"/);
+  assert.match(home.html, /data-alert="stalled"/);
+  assert.ok(home.html.includes(shipped.name), "stalled shipment listed");
+  assert.match(home.html, /wa-sidebar__badge--alert/, "alert badge on Home in the sidebar");
+  assert.match((await page("/app/cod")).html, /No valid WhatsApp number on this order/, "COD queue explains the missing number");
+
+  // Retry (Home posts to /app/cod) and Mark delivered (posts to /app/updates) clear them.
+  await act("/app/cod", { intent: "retry", id: row.id });
+  assert.equal((await orderRow(o)).actionError, null, "retry worked");
+  await act("/app/updates", { intent: "delivered", id: shippedRow.id });
+  const after = await page("/app");
+  assert.doesNotMatch(after.html, /data-alert="failed"/);
+  assert.doesNotMatch(after.html, /data-alert="stalled"/);
+
+  // Tidy up for the tests after this one.
+  await act("/app/cod", { intent: "status", id: (await orderRow(late)).id, status: "cancelled" });
+  await act("/app/cod", { intent: "status", id: (await orderRow(nophone)).id, status: "cancelled" });
+});
+
 /* ---------- abandoned checkouts ---------- */
 
 test("Abandoned checkouts: webhook → queue after the delay → send, dismiss; completed checkout leaves", async () => {

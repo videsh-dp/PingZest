@@ -4,8 +4,10 @@ import { getSettings } from "../models/settings.server";
 import { dashboardStats } from "../models/orders.server";
 import { fetchShopName } from "../models/shopify-admin.server";
 import { savedSummary } from "../models/rto.server";
+import { shopAlerts, alertDetails } from "../models/alerts.server";
+import { ACTION_LABELS } from "../lib/cod-loop.js";
 import prisma from "../db.server";
-import { Page, Card, Stat, Banner } from "../components/ui";
+import { Page, Card, Stat, Banner, ActionButton } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 
 export const loader = async ({ request }) => {
@@ -30,15 +32,15 @@ export const loader = async ({ request }) => {
     optin: `${editor}?template=cart&addAppBlockId=${apiKey}/optin&target=mainSection`,
   };
 
-  const [stats, saved] = await Promise.all([dashboardStats(shop), savedSummary(shop, settings, 30)]);
+  const [stats, saved, { alerts }, details] = await Promise.all([dashboardStats(shop), savedSummary(shop, settings, 30), shopAlerts(shop, settings), alertDetails(shop)]);
   const templatesSaved = await prisma.messageTemplate.count({ where: { shop } });
   const widgetsSaved = Boolean(await prisma.widgetConfig.findUnique({ where: { shop }, select: { syncedAt: true } }).then((w) => w?.syncedAt));
-  return { settings, stats, saved, deepLinks, templatesSaved, widgetsSaved };
+  return { settings, stats, saved, alerts, details, deepLinks, templatesSaved, widgetsSaved };
 };
 
 export default function Index() {
   const tr = useT();
-  const { settings, stats, saved, deepLinks, templatesSaved, widgetsSaved } = useLoaderData();
+  const { settings, stats, saved, alerts, details, deepLinks, templatesSaved, widgetsSaved } = useLoaderData();
   const app = useRouteLoaderData("routes/app") || {};
   const clicks = stats.clicksByType;
   const totalClicks = Object.values(clicks).reduce((a, b) => a + b, 0);
@@ -55,6 +57,58 @@ export default function Index() {
 
   return (
     <Page title={app.staff ? tr("Welcome, {name}", { name: app.staff.split(" ")[0] }) : "PingZest"} subtitle={`${app.plan === "pro" ? tr("Pro plan") : tr("Free plan")} · ${settings.storeName || app.shop || ""}`}>
+      {alerts.length > 0 && (
+        <Banner tone={alerts.some((a) => a.tone === "critical") ? "critical" : "attention"}>
+          <strong>{tr("Needs attention")}</strong>
+          <ul className="wa-alerts" aria-label={tr("Needs attention")}>
+            {alerts.map((a) => (
+              <li key={a.id} data-alert={a.id}>
+                {a.to.startsWith("#")
+                  ? <a href={a.to}>{tr.plural(a.text[0], a.text[1], a.count, a.vars)}</a>
+                  : <Link to={a.to}>{tr.plural(a.text[0], a.text[1], a.count, a.vars)}</Link>}
+              </li>
+            ))}
+          </ul>
+        </Banner>
+      )}
+
+      {details.failed.length > 0 && (
+        <Card title={tr("Shopify actions that failed")}>
+          <div id="failed">
+            {details.failed.map((f) => (
+              <div key={f.id} className="wa-alert-row">
+                <div>
+                  <strong>{f.orderName}</strong> · {tr(ACTION_LABELS[f.kind] || ACTION_LABELS.other)}
+                  <div className="wa-muted wa-small">{f.message} · {tr.ago(f.at)}</div>
+                </div>
+                <div className="wa-actions">
+                  <ActionButton action="/app/cod" intent="retry" id={f.id}>{tr("Retry")}</ActionButton>
+                  <ActionButton action="/app/cod" intent="dismissError" id={f.id}>{tr("Dismiss")}</ActionButton>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="wa-muted wa-small">{tr("Usually a missing permission or an order changed in Shopify. Retry, or fix it in Shopify and dismiss.")}</p>
+        </Card>
+      )}
+
+      {details.stalled.length > 0 && (
+        <Card title={tr("Shipments without delivery")}>
+          <div id="stalled">
+            {details.stalled.map((o) => (
+              <div key={o.id} className="wa-alert-row">
+                <div>
+                  <strong>{o.orderName}</strong>
+                  <div className="wa-muted wa-small">{tr("shipped {when}", { when: tr.ago(o.shippedAt) })}{o.trackingUrl ? " · " : ""}{o.trackingUrl && <a href={o.trackingUrl} target="_blank" rel="noopener noreferrer">{tr("Track")}</a>}</div>
+                </div>
+                <ActionButton action="/app/updates" intent="delivered" id={o.id}>{tr("Mark delivered")}</ActionButton>
+              </div>
+            ))}
+          </div>
+          <p className="wa-muted wa-small">{tr("Check with the courier before the customer asks. If a parcel came back, mark it Returned (RTO) in COD confirmation.")}</p>
+        </Card>
+      )}
+
       {stats.codTodo > 0 && (
         <Banner tone="attention">
           <strong>{tr.plural("{count} COD order needs confirmation.", "{count} COD orders need confirmation.", stats.codTodo)}</strong>{" "}

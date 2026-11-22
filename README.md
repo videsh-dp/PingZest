@@ -26,6 +26,7 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | **Widget analytics** | Views, clicks, click rate per widget; clicks per day (7/30/90 days); mobile vs desktop; by page; discount funnel → orders and sales from your codes | App proxy |
 | **Login** | Merchants sign in with their **Shopify account** (OAuth / token exchange). Public landing + "Log in with Shopify" page, staff name shown, sign-out | – |
 | Admin | Dashboard, setup checklist, one-click theme editor links | – |
+| **Alerts** | Home shows what's stuck, with a red badge on Home in the sidebar: failed Shopify actions (tag / hold / release / cancel, with Retry and Dismiss), COD orders not sent for 12 h+, waiting for a reply past the reminder or expiry time, orders without a valid WhatsApp number, shipments in transit 7+ days. Nothing is sent outside the app | – |
 | Admin | **COD confirmation queue** → Send / Waiting / To remind / Confirmed / Cancelled / No reply | Level 2 customer data |
 | **COD follow-up** | Optional **fulfillment hold** on new COD orders, released on confirm; **reminder** list after X hours (own reminder template); **expire** after Y hours with a no-reply tag; one-click **cancel + restock in Shopify** for cancelled / unanswered orders; failed Shopify actions shown on the order with Retry | `write_merchant_managed_fulfillment_orders`, `write_orders` |
 | Admin | Abandoned checkout queue and order updates queue (shipped / delivered) | Level 2 customer data |

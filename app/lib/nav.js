@@ -10,7 +10,7 @@ export const NAV_SECTIONS = [
   {
     title: N_("Overview"),
     items: [
-      { to: "/app", label: N_("Home"), icon: "⌂", end: true },
+      { to: "/app", label: N_("Home"), icon: "⌂", end: true, badge: "alerts" },
       { to: "/app/analytics", label: N_("Analytics"), icon: "📈" },
     ],
   },
