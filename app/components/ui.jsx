@@ -2,27 +2,31 @@
  * Small UI kit for the embedded admin (plain React + app.css, styled to sit
  * comfortably inside Shopify admin). Swap for Polaris components later if you like.
  */
-import { useId, useMemo, useRef, useState } from "react";
-import { Link, useFetcher, useLocation, useNavigate, useSearchParams } from "react-router";
-import { sectionFor } from "../lib/nav.js";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Link, useBlocker, useFetcher, useNavigate, useSearchParams } from "react-router";
 import { composeMessage } from "../lib/compose.js";
 import { formatWhatsApp } from "../lib/whatsapp-format.js";
 import { useT } from "../i18n/react.jsx";
 import { LOCALES, N_ } from "../i18n/core.js";
 
 /**
- * Every page has the same anatomy: category label → title → one-line explanation → main action,
- * then optional tabs, then the content. The category comes from the sidebar (app/lib/nav.js).
+ * Every page has the same anatomy: (back link) → title → one-line explanation → page actions,
+ * then optional tabs, then the content. Shopify's admin menu shows where the merchant is, so the
+ * page repeats no navigation of its own.
+ *   backTo: { to, label } for sub-pages (an editor, Plan, Discounts), shown as a breadcrumb.
+ *   size: "large" for lists and dashboards, "small" for forms such as Settings.
  */
-export function Page({ title, subtitle, actions, tabs, children }) {
+export function Page({ title, subtitle, actions, tabs, children, backTo, size }) {
   const tr = useT();
-  const { pathname } = useLocation();
-  const where = sectionFor(pathname);
   return (
-    <div className="wa-page">
+    <div className={`wa-page${size ? ` wa-page--${size}` : ""}`}>
+      {backTo && (
+        <nav className="wa-breadcrumb" aria-label={tr("Breadcrumb")}>
+          <Link to={backTo.to} className="wa-breadcrumb__link"><span aria-hidden="true">←</span> {backTo.label}</Link>
+        </nav>
+      )}
       <div className="wa-page__head">
         <div>
-          {where?.section && <p className="wa-page__eyebrow">{tr(where.section.title)}</p>}
           <h1 className="wa-page__title">{title}</h1>
           {subtitle && <p className="wa-page__subtitle">{subtitle}</p>}
         </div>
@@ -70,25 +74,67 @@ export function StatusBadge({ status }) {
 
 /**
  * Tabs that filter what the server loads (each tab is a link: ?filter=…). Use TabBar for tabs that
- * only switch panels on the page.
+ * only switch panels on the page. `main` lists the tab ids shown side by side; the others go under a
+ * "More" menu so the row never wraps (at most 4 slots on a phone).
  */
-export function Tabs({ tabs, param = "filter", label, variant }) {
+export function Tabs({ tabs, param = "filter", label, variant, main }) {
   const tr = useT();
   const [params] = useSearchParams();
   const current = params.get(param) || tabs[0].id;
+  const href = (id) => {
+    const next = new URLSearchParams(params);
+    next.set(param, id);
+    return `?${next.toString()}`;
+  };
+  const shown = main ? tabs.filter((t) => main.includes(t.id)) : tabs;
+  const more = main ? tabs.filter((t) => !main.includes(t.id)) : [];
+  const moreActive = more.find((t) => t.id === current);
+  const item = (t) => (
+    <Link key={t.id} to={href(t.id)} className={`${variant === "segmented" ? "wa-seg__item" : "wa-tab"} ${current === t.id ? "is-active" : ""}`} aria-current={current === t.id ? "page" : undefined} preventScrollReset>
+      {t.label}
+      {typeof t.count === "number" && <span className="wa-tab__count">{t.count}</span>}
+    </Link>
+  );
   return (
     <nav className={variant === "segmented" ? "wa-seg wa-seg--links" : "wa-tabs"} aria-label={label || tr("Filter")}>
-      {tabs.map((t) => {
-        const next = new URLSearchParams(params);
-        next.set(param, t.id);
-        return (
-          <Link key={t.id} to={`?${next.toString()}`} className={`${variant === "segmented" ? "wa-seg__item" : "wa-tab"} ${current === t.id ? "is-active" : ""}`} aria-current={current === t.id ? "page" : undefined} preventScrollReset>
-            {t.label}
-            {typeof t.count === "number" && <span className="wa-tab__count">{t.count}</span>}
-          </Link>
-        );
-      })}
+      {shown.map(item)}
+      {more.length > 0 && (
+        <details className={`wa-tabmore${moreActive ? " is-active" : ""}`}>
+          <summary className={`wa-tab${moreActive ? " is-active" : ""}`}>
+            {moreActive ? moreActive.label : tr("More")}
+            {moreActive && typeof moreActive.count === "number" && <span className="wa-tab__count">{moreActive.count}</span>}
+            <span aria-hidden="true" className="wa-tabmore__caret">▾</span>
+          </summary>
+          <div className="wa-menu" role="menu">
+            {more.map((t) => (
+              <Link key={t.id} role="menuitem" to={href(t.id)} className={`wa-menu__item${current === t.id ? " is-active" : ""}`} aria-current={current === t.id ? "page" : undefined} preventScrollReset
+                onClick={(e) => e.currentTarget.closest("details")?.removeAttribute("open")}>
+                <span>{t.label}</span>
+                {typeof t.count === "number" && <span className="wa-tab__count">{t.count}</span>}
+              </Link>
+            ))}
+          </div>
+        </details>
+      )}
     </nav>
+  );
+}
+
+/**
+ * Row actions menu ("More actions"): the less common actions of a list row, so each row shows one
+ * button plus this menu. Children are buttons or ActionButtons.
+ */
+export function ActionMenu({ children, label }) {
+  const tr = useT();
+  const items = (Array.isArray(children) ? children.flat() : [children]).filter(Boolean);
+  if (!items.length) return null;
+  return (
+    <details className="wa-rowmenu">
+      <summary className="wa-button wa-button--secondary wa-rowmenu__toggle" aria-label={label || tr("More actions")}>
+        <span aria-hidden="true">•••</span>
+      </summary>
+      <div className="wa-menu wa-menu--end" role="menu">{items}</div>
+    </details>
   );
 }
 
@@ -120,13 +166,17 @@ export function TabBar({ tabs, current, onSelect, label }) {
     const step = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
     if (!step) return;
     const dir = typeof document !== "undefined" && document.dir === "rtl" ? -step : step;
-    const next = (i + dir + tabs.length) % tabs.length;
-    refs.current[next]?.focus();
-    onSelect(tabs[next].id);
+    const panels = tabs.filter((t) => !t.to);
+    const at = panels.findIndex((t) => t.id === tabs[i].id);
+    const next = panels[(at + dir + panels.length) % panels.length];
+    refs.current[tabs.indexOf(next)]?.focus();
+    onSelect(next.id);
   };
   return (
     <div className="wa-tabs" role="tablist" aria-label={label || tr("Sections")}>
-      {tabs.map((t, i) => (
+      {tabs.map((t, i) => t.to ? (
+        <Link key={t.id} to={t.to} className="wa-tab wa-tab--link">{t.label} <span aria-hidden="true">→</span></Link>
+      ) : (
         <button
           key={t.id}
           ref={(el) => (refs.current[i] = el)}
@@ -156,7 +206,7 @@ export function TabBar({ tabs, current, onSelect, label }) {
  * columns: [{ key, label, render(row), align: "right", primary: true }]
  * searchText(row) → the text the search box matches (order, customer, phone…)
  */
-export function ListView({ rows, columns, rowKey = "id", searchText, searchPlaceholder, toolbar, empty, caption }) {
+export function ListView({ rows, columns, rowKey = "id", searchText, searchPlaceholder, toolbar, empty, caption, selectedKey, onRowClick }) {
   const tr = useT();
   const [q, setQ] = useState("");
   const needle = q.trim().toLowerCase();
@@ -189,7 +239,7 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
       {!hasRows ? (
         empty
       ) : shown.length === 0 ? (
-        <EmptyState icon="⌕" title={tr("No matches")} action={<button type="button" className="wa-button wa-button--secondary" onClick={() => setQ("")}>{tr("Clear search")}</button>}>
+        <EmptyState title={tr("No matches")} action={<button type="button" className="wa-button wa-button--secondary" onClick={() => setQ("")}>{tr("Clear search")}</button>}>
           {tr("Try another search, or clear it.")}
         </EmptyState>
       ) : (
@@ -200,7 +250,13 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
           </thead>
           <tbody>
             {shown.map((r) => (
-              <tr key={r[rowKey]}>
+              <tr
+                key={r[rowKey]}
+                data-row={r[rowKey]}
+                className={selectedKey != null && selectedKey === r[rowKey] ? "is-selected" : undefined}
+                aria-selected={selectedKey != null ? selectedKey === r[rowKey] : undefined}
+                onClick={onRowClick ? (e) => { if (!e.target.closest("a, button, summary, input, select, textarea, dialog")) onRowClick(r); } : undefined}
+              >
                 {columns.map((c) => (
                   <td key={c.key} data-label={c.label} className={[c.align === "right" ? "wa-right" : "", c.primary ? "wa-list__primary" : "", c.key === "actions" ? "wa-list__actions" : ""].filter(Boolean).join(" ") || undefined}>
                     {c.render ? c.render(r) : r[c.key]}
@@ -265,30 +321,180 @@ export function SendButton({ link, intent, id, extra = {}, label, disabled }) {
       href={link}
       target="_blank"
       rel="noopener noreferrer"
-      className={`wa-button wa-button--primary ${disabled ? "is-disabled" : ""}`}
+      className={`wa-button wa-button--whatsapp ${disabled ? "is-disabled" : ""}`}
       onClick={() => fetcher.submit({ intent, id: String(id), ...extra }, { method: "post" })}
     >
+      <WhatsAppIcon />
       {fetcher.state !== "idle" ? tr("Opening…") : label || tr("Send on WhatsApp")}
     </a>
   );
 }
 
-export function ActionButton({ intent, id, extra = {}, children, tone = "secondary", confirmText, action }) {
-  const fetcher = useFetcher();
+/** The WhatsApp mark (a speech bubble with a handset), for actions that open WhatsApp. */
+export function WhatsAppIcon() {
   return (
-    <fetcher.Form
-      method="post"
-      action={action}
-      onSubmit={(e) => { if (confirmText && !window.confirm(confirmText)) e.preventDefault(); }}
-    >
-      <input type="hidden" name="intent" value={intent} />
-      <input type="hidden" name="id" value={id} />
-      {Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
-      <button type="submit" className={`wa-button wa-button--${tone}`} disabled={fetcher.state !== "idle"}>
-        {children}
-      </button>
-    </fetcher.Form>
+    <svg className="wa-wa-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2c0 1.3 1 2.6 1.1 2.8.1.2 1.9 2.9 4.6 4 1.7.7 2.4.8 3.2.6.5-.1 1.5-.6 1.8-1.2.2-.6.2-1.1.1-1.2l-.5-.3Z" />
+    </svg>
   );
+}
+
+/**
+ * A one-click action posted to the page's action (or `action`). With confirmText it asks first in a
+ * styled modal (never the browser's window.confirm, which looks foreign inside Shopify admin).
+ */
+export function ActionButton({ intent, id, extra = {}, children, tone = "secondary", confirmText, confirmTitle, confirmLabel, action }) {
+  const tr = useT();
+  const fetcher = useFetcher();
+  const formRef = useRef(null);
+  const [asking, setAsking] = useState(false);
+  return (
+    <>
+      <fetcher.Form
+        method="post"
+        action={action}
+        ref={formRef}
+        onSubmit={(e) => { if (confirmText && !asking) { e.preventDefault(); setAsking(true); } }}
+      >
+        <input type="hidden" name="intent" value={intent} />
+        <input type="hidden" name="id" value={id} />
+        {Object.entries(extra).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
+        <button type="submit" className={`wa-button wa-button--${tone}`} disabled={fetcher.state !== "idle"}>
+          {children}
+        </button>
+      </fetcher.Form>
+      {confirmText && (
+        <ConfirmModal
+          open={asking}
+          title={confirmTitle || (typeof children === "string" ? children : tr("Are you sure?"))}
+          confirmLabel={confirmLabel || (typeof children === "string" ? children : tr("Confirm"))}
+          destructive={tone === "critical"}
+          onCancel={() => setAsking(false)}
+          onConfirm={() => { setAsking(false); fetcher.submit(formRef.current); }}
+        >
+          {confirmText}
+        </ConfirmModal>
+      )}
+    </>
+  );
+}
+
+/**
+ * Shopify-style modal (heading, message, one primary and one secondary action), on the native <dialog>
+ * element: focus is trapped, Esc closes it, and it works in the Shopify mobile app's webview.
+ */
+export function ConfirmModal({ open, title, children, confirmLabel, cancelLabel, destructive = false, onConfirm, onCancel, busy = false }) {
+  const tr = useT();
+  const ref = useRef(null);
+  useEffect(() => {
+    const d = ref.current;
+    if (!d) return;
+    if (open && !d.open) { if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", ""); }
+    if (!open && d.open) d.close();
+  }, [open]);
+  return (
+    <dialog
+      ref={ref}
+      className="wa-modal"
+      aria-labelledby={title ? undefined : undefined}
+      onCancel={(e) => { e.preventDefault(); onCancel?.(); }}
+      onClick={(e) => { if (e.target === ref.current) onCancel?.(); }}
+      data-modal
+    >
+      {open && (
+        <div className="wa-modal__box" role="document">
+          <div className="wa-modal__head">
+            <h2 className="wa-modal__title">{title}</h2>
+            <button type="button" className="wa-icon-button" onClick={onCancel} aria-label={tr("Close")}><span aria-hidden="true">×</span></button>
+          </div>
+          <div className="wa-modal__body">{children}</div>
+          <div className="wa-modal__foot">
+            <button type="button" className="wa-button wa-button--secondary" onClick={onCancel} autoFocus>{cancelLabel || tr("Cancel")}</button>
+            <button type="button" className={`wa-button ${destructive ? "wa-button--danger" : "wa-button--primary"}`} onClick={onConfirm} disabled={busy}>{confirmLabel || tr("Confirm")}</button>
+          </div>
+        </div>
+      )}
+    </dialog>
+  );
+}
+
+/**
+ * Shopify's contextual save bar (App Bridge <ui-save-bar>) for a form with unsaved changes, plus a guard
+ * so the merchant can't leave the page without choosing Save or Discard (Built for Shopify 4.1.5):
+ *   - inside Shopify admin the save bar sits in the admin's top bar, and Shopify blocks its own menu;
+ *   - links inside the app ask in a modal first (React Router's blocker);
+ *   - closing or reloading the tab asks the browser's "leave site?" question.
+ * Without App Bridge (tests, local preview) the same bar shows at the bottom of the page.
+ */
+export function SaveBar({ id, dirty, saving = false, onSave, onDiscard, saveDisabled = false, guard = dirty }) {
+  const tr = useT();
+  useEffect(() => {
+    const bar = typeof window !== "undefined" ? window.shopify?.saveBar : null;
+    if (!bar) return undefined;
+    try { (dirty && guard ? bar.show(id) : bar.hide(id)); } catch { /* App Bridge not ready */ }
+    return () => { try { bar.hide(id); } catch { /* gone */ } };
+  }, [dirty, guard, id]);
+  useEffect(() => {
+    if (!guard) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [guard]);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => guard && !saving && currentLocation.pathname + currentLocation.search !== nextLocation.pathname + nextLocation.search);
+  return (
+    <>
+      <ui-save-bar id={id} data-open={dirty && guard ? "true" : "false"}>
+        <button type="button" variant="primary" onClick={onSave} disabled={saveDisabled || saving || undefined} loading={saving ? "" : undefined}>{saving ? tr("Saving…") : tr("Save")}</button>
+        <button type="button" onClick={onDiscard} disabled={saving || undefined}>{tr("Discard")}</button>
+        <span className="wa-savebar__label">{tr("Unsaved changes")}</span>
+      </ui-save-bar>
+      <ConfirmModal
+        open={blocker.state === "blocked"}
+        title={tr("Leave page with unsaved changes?")}
+        confirmLabel={tr("Leave page")}
+        cancelLabel={tr("Stay")}
+        destructive
+        onCancel={() => blocker.reset?.()}
+        onConfirm={() => { onDiscard?.(); blocker.proceed?.(); }}
+      >
+        {tr("Leaving this page will discard your changes.")}
+      </ConfirmModal>
+    </>
+  );
+}
+
+/**
+ * Unsaved-changes tracking for an uncontrolled <form>: compares the form's current values with the values
+ * it had when it was last loaded or saved (`savedKey` changes after a save). Returns [dirty, discard].
+ */
+export function useFormDirty(formRef, savedKey) {
+  const [dirty, setDirty] = useState(false);
+  const snap = useRef("");
+  const read = () => {
+    const f = formRef.current;
+    if (!f) return "";
+    const pairs = [];
+    for (const el of f.elements) {
+      if (!el.name || el.type === "hidden" || el.disabled) continue;
+      pairs.push(`${el.name}=${el.type === "checkbox" || el.type === "radio" ? el.checked : el.value}`);
+    }
+    return pairs.join("&");
+  };
+  useEffect(() => {
+    snap.current = read();
+    setDirty(false);
+    const f = formRef.current;
+    if (!f) return undefined;
+    const check = () => setDirty(read() !== snap.current);
+    f.addEventListener("input", check);
+    f.addEventListener("change", check);
+    return () => { f.removeEventListener("input", check); f.removeEventListener("change", check); };
+  }, [savedKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const discard = () => {
+    formRef.current?.reset();
+    setDirty(false);
+  };
+  return [dirty, discard];
 }
 
 export function MessagePreview({ message, missing = [], warning }) {
@@ -357,5 +563,73 @@ export function SendWith({ templates, chosen, lang, langs, showTemplate = true }
       {showTemplate && <TemplatePicker templates={templates} chosen={chosen} />}
       <LangSwitch lang={lang} langs={langs} />
     </div>
+  );
+}
+
+/**
+ * Shopify's setup-guide pattern: "X of Y steps completed", a collapse chevron and a dismiss button.
+ * Steps tick themselves from real data; the first open step is expanded, the others show their title.
+ * steps: [{ id, done, title, text, action }]
+ */
+export function SetupGuide({ title, intro, steps, onDismiss }) {
+  const tr = useT();
+  const done = steps.filter((s) => s.done).length;
+  const firstOpen = steps.find((s) => !s.done)?.id;
+  const [open, setOpen] = useState(firstOpen);
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => {
+    try { setCollapsed(window.localStorage.getItem("pz-setup-collapsed") === "1"); } catch { /* private mode */ }
+  }, []);
+  useEffect(() => { setOpen(firstOpen); }, [firstOpen]);
+  const toggle = () => {
+    const next = !collapsed;
+    setCollapsed(next);
+    try { window.localStorage.setItem("pz-setup-collapsed", next ? "1" : "0"); } catch { /* private mode */ }
+  };
+  return (
+    <section className="wa-card wa-guide" aria-labelledby="wa-guide-title" data-setup-guide>
+      <div className="wa-guide__head">
+        <div>
+          <h2 className="wa-card__title" id="wa-guide-title">{title}</h2>
+          {!collapsed && intro && <p className="wa-muted wa-guide__intro">{intro}</p>}
+          <p className="wa-guide__progress">
+            <span className="wa-progress wa-guide__bar" role="progressbar" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={done} aria-label={tr("Setup progress")}>
+              <span className="wa-progress__bar" style={{ width: `${Math.round((done / steps.length) * 100)}%` }} />
+            </span>
+            <span className="wa-muted wa-small">{tr("{done} of {total} steps completed", { done, total: steps.length })}</span>
+          </p>
+        </div>
+        <div className="wa-guide__tools">
+          <button type="button" className="wa-icon-button" onClick={toggle} aria-expanded={!collapsed} aria-controls="wa-guide-steps" aria-label={collapsed ? tr("Show steps") : tr("Hide steps")}>
+            <span aria-hidden="true" className={`wa-chevron${collapsed ? "" : " is-open"}`} />
+          </button>
+          <button type="button" className="wa-icon-button" onClick={onDismiss} aria-label={tr("Dismiss the setup guide")} data-dismiss-setup>
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+      </div>
+      <ol className="wa-guide__steps" id="wa-guide-steps" hidden={collapsed}>
+        {steps.map((s) => {
+          const expanded = open === s.id && !s.done;
+          return (
+            <li key={s.id} className={`wa-guide__step${s.done ? " is-done" : ""}${expanded ? " is-open" : ""}`} data-step={s.id} data-done={s.done ? "1" : "0"}>
+              <span className="wa-guide__check" aria-hidden="true">{s.done ? "✓" : ""}</span>
+              <div className="wa-guide__body">
+                <button type="button" className="wa-guide__title" aria-expanded={expanded} onClick={() => setOpen(s.id)}>
+                  {s.title}
+                  <span className="wa-visually-hidden">{s.done ? ` (${tr("done")})` : ""}</span>
+                </button>
+                {expanded && (
+                  <div className="wa-guide__detail">
+                    <p className="wa-muted">{s.text}</p>
+                    <div>{s.action}</div>
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

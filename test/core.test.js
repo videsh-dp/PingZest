@@ -163,6 +163,10 @@ test("tokens", () => {
   assert.equal(isValidTokenFormat(t), true);
   assert.notEqual(t, generateToken());
   assert.equal(isValidTokenFormat("../etc/passwd"), false);
+  assert.equal(t.length, 22, "128-bit tokens");
+  assert.equal(Buffer.from(t, "base64url").length, 16);
+  assert.equal(isValidTokenFormat("Ab3dE5fG7hJ9"), true, "older 12-character links still open");
+  assert.equal(isValidTokenFormat("sample"), false);
   const exp = tokenExpiry(new Date("2026-01-01T00:00:00Z"));
   assert.equal((exp - new Date("2026-01-01T00:00:00Z")) / 86400000, TOKEN_TTL_DAYS);
 });
@@ -219,4 +223,22 @@ test("validateTemplate", async () => {
   assert.match(validateTemplate({ type: "shipped", lang: "en", name: "S", body: "{checkout_link}" }), /isn't available/);
   assert.match(validateTemplate({ type: "cod_confirm", lang: "en", name: "C", body: "Hi {name}" }), /confirm_link/);
   assert.match(validateTemplate({ type: "nope", lang: "en", name: "C", body: "x" }), /Unknown stage/);
+});
+
+test("theme app embed status from App Bridge's app.extensions()", async () => {
+  const { embedOn, embedActivation } = await import("../app/lib/embed.js");
+  const list = [
+    { handle: "checkout", type: "ui_extension", activations: [{ target: "purchase.thank-you.block.render" }] },
+    { handle: "pingzest-widgets", type: "theme_app_extension", activations: [
+      { target: "section", handle: "product-button", status: "available" },
+      { target: "body", handle: "app-embed", status: "active", activations: [{ target: "theme", themeId: "gid://shopify/OnlineStoreTheme/1" }] },
+    ] },
+  ];
+  assert.equal(embedActivation(list).status, "active");
+  assert.equal(embedActivation([]), null);
+  const now = Date.now();
+  assert.equal(embedOn({ embedActiveAt: new Date(now - 60e3), embedCheckedAt: new Date(now - 60e3) }, now), true);
+  assert.equal(embedOn({ embedActiveAt: new Date(now - 3600e3), embedCheckedAt: new Date(now - 60e3) }, now), false, "latest check said off");
+  assert.equal(embedOn({ embedManual: true }, now), true);
+  assert.equal(embedOn({}, now), false);
 });

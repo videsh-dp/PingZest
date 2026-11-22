@@ -1,8 +1,8 @@
-import { useLoaderData, useRouteLoaderData, useSearchParams } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
-import { cartQueue, markCheckoutSent, dismissCheckout, restoreCheckout, logSend } from "../models/orders.server";
+import { cartQueue, markCheckoutSent, dismissCheckout, restoreCheckout, logSend, navCounts } from "../models/orders.server";
 import { cartRowData, templatesFor, pickLang } from "../models/messages.server";
 import { formatMoney } from "../lib/orders.js";
 import { useT } from "../i18n/react.jsx";
@@ -15,13 +15,14 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const filter = new URL(request.url).searchParams.get("filter") || "todo";
   const [settings, templates] = await Promise.all([getSettings(shop), listTemplates(shop)]);
-  const rows = await cartQueue(shop, { delayMin: settings.abandonDelayMin, filter });
+  const [rows, counts] = await Promise.all([cartQueue(shop, { delayMin: settings.abandonDelayMin, filter }), navCounts(shop, { delayMin: settings.abandonDelayMin, settings })]);
   const lang = pickLang(request, settings);
   return {
     lang,
     templates: templatesFor(templates, "abandoned_cart"),
     langs: [...new Set(templates.filter((t) => t.type === "abandoned_cart").map((t) => t.lang))],
     delay: settings.abandonDelayMin,
+    counts,
     rows: rows.map((c) => ({
       id: c.id,
       customerName: c.customerName,
@@ -52,8 +53,7 @@ export const action = async ({ request }) => {
 
 export default function Carts() {
   const tr = useT();
-  const { rows, lang, delay, templates, langs } = useLoaderData();
-  const counts = useRouteLoaderData("routes/app")?.counts || {};
+  const { rows, lang, delay, templates, langs, counts } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
@@ -94,6 +94,7 @@ export default function Carts() {
   ];
   return (
     <Page
+      size="large"
       title={tr("Abandoned checkouts")}
       subtitle={tr("Shoppers who entered a phone number but didn't finish checkout in the last 7 days (after {delay} min).", { delay })}
       tabs={<Tabs tabs={tabs} label={tr("Abandoned checkouts")} />}
@@ -112,7 +113,7 @@ export default function Carts() {
           searchPlaceholder={tr("Search customers, phone numbers or products")}
           toolbar={filter === "todo" ? <SendWith templates={forLang} chosen={chosen} lang={lang} langs={langs} /> : null}
           empty={
-            <EmptyState icon="🛒" title={filter === "recovered" ? tr("No recovered checkouts yet") : filter === "dismissed" ? tr("Nothing dismissed") : tr("No abandoned checkouts right now")}>
+            <EmptyState title={filter === "recovered" ? tr("No recovered checkouts yet") : filter === "dismissed" ? tr("Nothing dismissed") : tr("No abandoned checkouts right now")}>
               {filter === "todo" ? tr("Checkouts show up here {delay} minutes after the shopper leaves, so they have time to finish on their own.", { delay }) : null}
             </EmptyState>
           }

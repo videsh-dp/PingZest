@@ -1,8 +1,8 @@
-import { useLoaderData, useRouteLoaderData, useSearchParams } from "react-router";
+import { useLoaderData, useSearchParams } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
-import { updatesQueue, markUpdateSent, markDelivered, logSend } from "../models/orders.server";
+import { updatesQueue, markUpdateSent, markDelivered, logSend, navCounts } from "../models/orders.server";
 import { updateRowData, templatesFor, pickLang } from "../models/messages.server";
 import { useT } from "../i18n/react.jsx";
 
@@ -13,12 +13,14 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const filter = new URL(request.url).searchParams.get("filter") || "shipped";
-  const [settings, templates, rows] = await Promise.all([getSettings(shop), listTemplates(shop), updatesQueue(shop, filter)]);
+  const settings = await getSettings(shop);
+  const [templates, rows, counts] = await Promise.all([listTemplates(shop), updatesQueue(shop, filter), navCounts(shop, { delayMin: settings.abandonDelayMin, settings })]);
   const lang = pickLang(request, settings);
   const kind = filter === "delivered" ? "delivered" : "shipped";
   return {
     lang,
     filter,
+    counts,
     templates: templatesFor(templates, kind),
     langs: [...new Set(templates.filter((t) => t.type === kind).map((t) => t.lang))],
     rows: rows.map((o) => ({
@@ -51,8 +53,7 @@ export const action = async ({ request }) => {
 
 export default function Updates() {
   const tr = useT();
-  const { rows, lang, filter, templates, langs } = useLoaderData();
-  const counts = useRouteLoaderData("routes/app")?.counts || {};
+  const { rows, lang, filter, templates, langs, counts } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
@@ -107,6 +108,7 @@ export default function Updates() {
   ];
   return (
     <Page
+      size="large"
       title={tr("Order updates")}
       subtitle={tr("Shipping and delivery messages. Orders appear here when you fulfil them in Shopify.")}
       tabs={<Tabs tabs={tabs} label={tr("Order updates")} />}
@@ -120,7 +122,7 @@ export default function Updates() {
           searchPlaceholder={tr("Search orders, customers or phone numbers")}
           toolbar={filter !== "done" ? <SendWith templates={forLang} chosen={chosen} lang={lang} langs={langs} /> : null}
           empty={
-            <EmptyState icon="📦" title={tr("Nothing to send")}>
+            <EmptyState title={tr("Nothing to send")}>
               {current === "delivered"
                 ? tr("Delivered orders appear when your courier marks them delivered, or when you mark them below in the Shipped tab.")
                 : tr("Fulfil an order in Shopify to see it here.")}

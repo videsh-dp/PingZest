@@ -16,7 +16,7 @@ export const isTestBilling = () => process.env.BILLING_TEST !== "false";
 export function billingReturnUrl(shop) {
   const handle = process.env.SHOPIFY_APP_HANDLE || "pingzest";
   const store = String(shop).replace(".myshopify.com", "");
-  return `https://admin.shopify.com/store/${store}/apps/${handle}/app/plan?upgraded=1`;
+  return `https://admin.shopify.com/store/${store}/apps/${handle}/app/settings/plan?upgraded=1`;
 }
 
 async function setPlan(shop, { plan, subscriptionId = null, subscriptionName = null, trialEndsAt = null }, admin, source) {

@@ -53,16 +53,29 @@ after(() => app?.stop());
 
 /* ---------- embedded auth ---------- */
 
-test("opening the app authenticates with the session token (token exchange) and shows Home with the sidebar", async () => {
+test("opening the app authenticates with the session token (token exchange) and shows Home; Shopify's admin menu is the only navigation", async () => {
   const r = await page("/app");
   assertPage(r, "Home");
-  assert.match(r.html, /wa-sidebar/, "left sidebar rendered");
-  for (const href of ["/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/plan"]) {
-    assert.ok(r.html.includes(`href="${href}?`) || r.html.includes(`href="${href}"`), `sidebar link ${href}`);
-  }
+  assert.doesNotMatch(r.html, /wa-sidebar/, "no second menu inside the app (Built for Shopify 4.1.4)");
+  const menu = r.html.slice(r.html.indexOf("<ui-nav-menu"), r.html.indexOf("</ui-nav-menu>"));
+  assert.ok(menu.length > 0, "NavMenu rendered");
+  const hrefs = [...menu.matchAll(/href="([^"?]+)/g)].map((m) => m[1]);
+  assert.deepEqual(hrefs, ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/templates", "/app/widgets", "/app/analytics", "/app/settings"], "home link + 7 items, COD first");
+  assert.match(menu, /rel="home"/);
+  assert.doesNotMatch(menu, /[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/u, "no emoji in the menu");
   const online = await prisma.session.findFirst({ where: { shop: SHOP, isOnline: true } });
   assert.ok(online, "online session stored after token exchange");
   assert.ok(await settings(), "shop settings created");
+});
+
+test("old Plan and Discounts addresses redirect to their new place under Settings and Widgets", async () => {
+  for (const [from, to] of [["/app/plan", "/app/settings/plan"], ["/app/discounts", "/app/widgets/discounts"]]) {
+    const r = await page(from, { upgraded: "1" });
+    assert.ok([301, 302].includes(r.status), `${from} redirects (${r.status})`);
+    const loc = new URL(r.headers.get("location"), BASE);
+    assert.equal(loc.pathname, to);
+    assert.equal(loc.searchParams.get("upgraded"), "1", "query kept");
+  }
 });
 
 test("a request without a valid session token doesn't get in", async () => {
@@ -77,14 +90,14 @@ test("a request without a valid session token doesn't get in", async () => {
 });
 
 test("every admin page renders", async () => {
-  for (const path of ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/plan"]) {
+  for (const path of ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/widgets/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/settings/plan"]) {
     assertPage(await page(path), path);
   }
   for (const l of ["hi", "ar", "es"]) assertPage(await page("/app/settings", { locale: l }), `settings in ${l}`);
 });
 
-test("every admin page in all 7 languages: translated sidebar, lang attribute, right-to-left for Arabic", async () => {
-  const PAGES = ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/plan"];
+test("every admin page in all 7 languages: translated admin menu, lang attribute, right-to-left for Arabic", async () => {
+  const PAGES = ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/widgets/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/settings/plan"];
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/'/g, "&#x27;");
   for (const l of ["en", "hi", "es", "pt-BR", "fr", "de", "ar"]) {
     const dict = l === "en" ? {} : JSON.parse(readFileSync(`app/i18n/locales/${l}.json`, "utf8"));
@@ -92,12 +105,50 @@ test("every admin page in all 7 languages: translated sidebar, lang attribute, r
       const r = await page(path, { locale: l });
       assertPage(r, `${path} in ${l}`);
       assert.ok(r.html.includes(`lang="${l}" dir="${l === "ar" ? "rtl" : "ltr"}"`), `${path} in ${l}: lang and direction`);
-      for (const key of ["Abandoned checkouts", "Message templates"]) {
+      for (const key of ["Abandoned checkouts", "Templates"]) {
         const text = dict[key] || key;
-        assert.ok(r.html.includes(text) || r.html.includes(esc(text)), `${path} in ${l}: sidebar shows "${text}"`);
+        assert.ok(r.html.includes(text) || r.html.includes(esc(text)), `${path} in ${l}: menu shows "${text}"`);
       }
     }
   }
+});
+
+test("Home setup guide: five COD-first steps that tick themselves, theme embed status, dismiss", async () => {
+  let home = await page("/app");
+  assertPage(home, "home");
+  assert.match(home.html, /data-setup-guide/);
+  for (const step of ["number", "firstSend", "hold", "cost", "embed"]) assert.match(home.html, new RegExp(`data-step="${step}"`), `step ${step}`);
+  assert.match(home.html, /data-step="embed" data-done="0"/);
+  await act("/app", { intent: "embedStatus", active: "1" });
+  await act("/app", { intent: "holdOn" });
+  assert.equal((await act("/app", { intent: "rtoCost", rtoCost: "550" })).status, 200);
+  const s = await settings();
+  assert.equal(s.codHold, true);
+  assert.equal(s.rtoCost, 550);
+  home = await page("/app");
+  assert.match(home.html, /data-step="embed" data-done="1"/, "embed reported active");
+  assert.match(home.html, /data-step="hold" data-done="1"/);
+  assert.match(home.html, /data-step="cost" data-done="1"/);
+  assert.match(home.html, /Store widgets are live/);
+  await act("/app", { intent: "embedStatus", active: "0" });
+  assert.match((await page("/app")).html, /data-step="embed" data-done="0"/, "embed turned off again");
+  await act("/app", { intent: "dismissSetup" });
+  assert.doesNotMatch((await page("/app")).html, /data-setup-guide/, "dismissed");
+  await act("/app", { intent: "showSetup" });
+  assert.match((await page("/app")).html, /data-setup-guide/);
+  await prisma.shopSettings.update({ where: { shop: SHOP }, data: { codHold: false, rtoCost: null } });
+});
+
+test("sample confirm page for \"Send a test to yourself\" changes nothing; unknown shops get 404", async () => {
+  const r = await fetch(`${BASE}/c/sample?shop=${SHOP}`);
+  assert.equal(r.status, 200);
+  const html = await r.text();
+  assert.match(html, /#1001/);
+  assert.match(html, /never ask for an OTP/);
+  const post = await fetch(`${BASE}/c/sample?shop=${SHOP}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: "choice=cancelled", redirect: "manual" });
+  assert.ok(post.status < 400);
+  assert.equal((await fetch(`${BASE}/c/sample?shop=nope.myshopify.com`)).status, 404);
+  assert.equal((await fetch(`${BASE}/c/sample`)).status, 404);
 });
 
 /* ---------- settings ---------- */
@@ -107,7 +158,9 @@ test("Settings: save store details; invalid number shows an error", async () => 
   assert.equal(bad.status, 200);
   assert.notEqual((await settings()).storeName, "Golibar", "invalid form isn't saved");
 
-  const ok = await act("/app/settings", { storeName: "Golibar", whatsappNumber: "98765 43210", countryCode: "91", defaultLang: "hi", appLocale: "auto", confirmedTag: "cod-yes", cancelledTag: "cod-no", abandonDelayMin: "45" });
+  await act("/app/settings", { storeName: "Golibar", whatsappNumber: "98765 43210", countryCode: "91", logoUrl: "javascript:alert(1)" });
+  assert.notEqual((await settings()).logoUrl, "javascript:alert(1)", "only https logos");
+  const ok = await act("/app/settings", { storeName: "Golibar", whatsappNumber: "98765 43210", countryCode: "91", defaultLang: "hi", appLocale: "auto", confirmedTag: "cod-yes", cancelledTag: "cod-no", abandonDelayMin: "45", logoUrl: "https://cdn.example.com/logo.png" });
   assert.equal(ok.status, 200);
   const s = await settings();
   assert.equal(s.storeName, "Golibar");
@@ -115,6 +168,9 @@ test("Settings: save store details; invalid number shows an error", async () => 
   assert.equal(s.defaultLang, "hi");
   assert.equal(s.confirmedTag, "cod-yes");
   assert.equal(s.abandonDelayMin, 45);
+  assert.equal(s.logoUrl, "https://cdn.example.com/logo.png");
+  assert.match((await page("/app/settings")).html, /Signed in with Shopify/, "account shown; no sign-out in the embedded app");
+  assert.doesNotMatch((await page("/app/settings")).html, /Sign out/);
 });
 
 /* ---------- templates (Free limit of 5) ---------- */
@@ -151,6 +207,19 @@ test("Templates: seeded, create/update/duplicate/default/delete, and the Free li
   const defaults = await prisma.messageTemplate.count({ where: { shop: SHOP, type: "cod_confirm", lang: "en", isDefault: true } });
   assert.equal(defaults, 1, "another template became the default");
 
+  // Each template opens in its own page; new ones from the standard text; the 5-template limit shows on the list.
+  const c2 = await prisma.messageTemplate.findFirst({ where: { shop: SHOP, name: "Custom 2" } });
+  const editor = await page(`/app/templates/${c2.id}`);
+  assertPage(editor, "template editor page");
+  assert.match(editor.html, /Custom 2/);
+  assert.match(editor.html, /wa-breadcrumb/);
+  assertPage(await page("/app/templates/new", { type: "cod_reminder", lang: "hi", from: "standard" }), "new template page");
+  assert.equal((await page("/app/templates/000000000000000000000000")).status, 404);
+  assert.match((await page("/app/templates")).html, /data-template-limit/, "Free limit message");
+  const viaEditor = await act(`/app/templates/${c2.id}`, { intent: "update", id: c2.id, name: "Custom 2", body: `${body} !`, lang: "en" });
+  assert.equal(viaEditor.status, 200);
+  assert.ok((await prisma.messageTemplate.findUnique({ where: { id: c2.id } })).body.endsWith("!"), "saved from the editor page");
+
   const r = await act("/app/templates", { intent: "duplicate", id: (await prisma.messageTemplate.findFirst({ where: { shop: SHOP, name: "Custom 2" } })).id });
   assert.equal(r.status, 200);
   assert.equal(await prisma.messageTemplate.count({ where: { shop: SHOP, seeded: false } }), 5, "back at 5 after delete + duplicate");
@@ -160,7 +229,7 @@ test("Templates: seeded, create/update/duplicate/default/delete, and the Free li
 
 test("Discounts: create in Shopify, validation, deactivate/activate, delete", async () => {
   let n = shopify.calls.length;
-  const r = await act("/app/discounts", { intent: "create", code: "WELCOME10", title: "Welcome", kind: "percentage", value: "10", minSubtotal: "500", endsAt: "", oncePerCustomer: "on" });
+  const r = await act("/app/widgets/discounts", { intent: "create", code: "WELCOME10", title: "Welcome", kind: "percentage", value: "10", minSubtotal: "500", endsAt: "", oncePerCustomer: "on" });
   assert.equal(r.status, 200);
   const d = await prisma.discount.findFirst({ where: { shop: SHOP, code: "WELCOME10" } });
   assert.ok(d?.shopifyGid, "discount saved with its Shopify id");
@@ -169,26 +238,29 @@ test("Discounts: create in Shopify, validation, deactivate/activate, delete", as
   assert.equal(sent.customerGets.value.percentage, 0.1);
   assert.equal(sent.minimumRequirement.subtotal.greaterThanOrEqualToSubtotal, "500");
 
-  await act("/app/discounts", { intent: "create", code: "WELCOME10", title: "Dup", kind: "percentage", value: "10" });
+  await act("/app/widgets/discounts", { intent: "create", code: "WELCOME10", title: "Dup", kind: "percentage", value: "10" });
   assert.equal(await prisma.discount.count({ where: { shop: SHOP, code: "WELCOME10" } }), 1, "duplicate code refused");
 
   shopify.state.failNext = "createDiscount";
-  await act("/app/discounts", { intent: "create", code: "FAILME", title: "Fail", kind: "fixed", value: "100" });
+  await act("/app/widgets/discounts", { intent: "create", code: "FAILME", title: "Fail", kind: "fixed", value: "100" });
   assert.equal(await prisma.discount.count({ where: { shop: SHOP, code: "FAILME" } }), 0, "Shopify error → not saved");
 
   n = shopify.calls.length;
-  await act("/app/discounts", { intent: "deactivate", id: d.id });
+  await act("/app/widgets/discounts", { intent: "deactivate", id: d.id });
   assert.equal((await prisma.discount.findUnique({ where: { id: d.id } })).active, false);
-  await act("/app/discounts", { intent: "activate", id: d.id });
+  await act("/app/widgets/discounts", { intent: "activate", id: d.id });
   assert.equal((await prisma.discount.findUnique({ where: { id: d.id } })).active, true);
   assert.deepEqual(opsSince(n).filter((o) => o === "toggleDiscount").length, 2);
 
-  await act("/app/discounts", { intent: "create", code: "BYE50", title: "Bye", kind: "fixed", value: "50" });
+  await act("/app/widgets/discounts", { intent: "create", code: "BYE50", title: "Bye", kind: "fixed", value: "50" });
   const bye = await prisma.discount.findFirst({ where: { shop: SHOP, code: "BYE50" } });
-  await act("/app/discounts", { intent: "delete", id: bye.id });
+  await act("/app/widgets/discounts", { intent: "delete", id: bye.id });
   assert.equal(await prisma.discount.findUnique({ where: { id: bye.id } }), null);
   assert.ok(shopify.calls.some((c) => c.op === "deleteDiscount"));
-  assertPage(await page("/app/discounts"), "discounts after changes");
+  assertPage(await page("/app/widgets/discounts"), "discounts after changes");
+  assertPage(await page("/app/widgets/discounts/new"), "create discount page");
+  await act("/app/widgets/discounts/new", { intent: "create", code: "PAGE20", title: "", kind: "percentage", value: "20" });
+  assert.ok(await prisma.discount.findFirst({ where: { shop: SHOP, code: "PAGE20" } }), "created from its own page");
 });
 
 /* ---------- widgets (metafield sync) ---------- */
@@ -237,10 +309,23 @@ test("COD: order webhook → queue → merchant sends → customer confirms on t
   assert.ok((await prisma.order.findUnique({ where: { id: row.id } })).codSentAt, "marked as sent");
   assert.ok(await prisma.messageLog.findFirst({ where: { shop: SHOP, refId: row.id, kind: "cod_confirm" } }), "send logged for analytics");
 
+  assert.equal(row.confirmToken.length, 22, "128-bit confirm token");
+  const timeline = await page(`/app/cod/${row.id}`);
+  assertPage(timeline, "order timeline");
+  assert.match(timeline.html, /data-event="created"/);
+  assert.match(timeline.html, /data-event="sent"/);
+  assert.ok(timeline.html.includes(`/admin/orders/${o.id}`), "link to the order in Shopify");
+  assert.equal((await page("/app/cod/000000000000000000000000")).status, 404);
+  for (const sort of ["newest", "value", "risk", "bogus"]) assertPage(await page("/app/cod", { sort }), `COD sorted by ${sort}`);
+
   const confirm = await fetch(`${BASE}/c/${row.confirmToken}`);
   assert.equal(confirm.status, 200);
   const html = await confirm.text();
   assert.ok(html.includes(o.name), "confirm page shows the order");
+  assert.match(html, /pay the courier in cash/, "cash on delivery line");
+  assert.match(html, /never ask for an OTP/, "no-OTP line");
+  assert.match(html, /Sunrise Apartments/, "address shown on Free (read-only)");
+  assert.doesNotMatch(html, /name="address1"/, "no address editing on Free");
 
   const n = shopify.calls.length;
   const post = await fetch(`${BASE}/c/${row.confirmToken}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: "choice=confirmed", redirect: "manual" });
@@ -468,7 +553,7 @@ test("Returns (Free): order facts saved, return cost setting, saved-on-returns h
   assert.equal((await orderRow(o)).rtoAt, null, "undo");
   await act("/app/cod", { intent: "rto", id: row.id, on: "1" });
 
-  const plan = await page("/app/plan");
+  const plan = await page("/app/settings/plan");
   assertPage(plan, "plan with savings");
   assert.match(plan.html, /Zero markup/);
   assert.match(plan.html, /saved you about/, "store's own savings on the Plan page");
@@ -508,7 +593,7 @@ test("Alerts: failed Shopify action, unsent and phoneless COD orders, stalled sh
   assert.match(home.html, /data-alert="noPhone"/);
   assert.match(home.html, /data-alert="stalled"/);
   assert.ok(home.html.includes(shipped.name), "stalled shipment listed");
-  assert.match(home.html, /wa-sidebar__badge--alert/, "alert badge on Home in the sidebar");
+  assert.match(home.html, /data-today="cod"/, "Today card lists the COD orders to send");
   assert.match((await page("/app/cod")).html, /No valid WhatsApp number on this order/, "COD queue explains the missing number");
 
   // Retry (Home posts to /app/cod) and Mark delivered (posts to /app/updates) clear them.
@@ -603,9 +688,9 @@ test("Analytics and Home show the activity", async () => {
 /* ---------- billing and Pro ---------- */
 
 test("Plan: upgrade starts Shopify's approval; approved subscription turns on Pro; limits lift", async () => {
-  assertPage(await page("/app/plan"), "plan (free)");
+  assertPage(await page("/app/settings/plan"), "plan (free)");
   const n = shopify.calls.length;
-  const up = await act("/app/plan", { intent: "upgrade", interval: "monthly" });
+  const up = await act("/app/settings/plan", { intent: "upgrade", interval: "monthly" });
   assert.ok(opsSince(n).some((o) => o === "anonymous" || /appSubscriptionCreate/.test(shopify.calls.at(-1).query)) || shopify.calls.slice(n).some((c) => /appSubscriptionCreate/.test(c.query)), "appSubscriptionCreate called");
   assert.ok([200, 302, 401].includes(up.status), `upgrade response ${up.status}`);
   const created = shopify.calls.slice(n).find((c) => /appSubscriptionCreate/.test(c.query));
@@ -623,7 +708,7 @@ test("Plan: upgrade starts Shopify's approval; approved subscription turns on Pr
   const proWidget = JSON.parse(shopify.state.metafields.at(-1).value);
   assert.equal(proWidget.branding, false, "plan change re-syncs the storefront widget without “Powered by PingZest”");
   await forcePlanCheck();
-  assertPage(await page("/app/plan", { upgraded: "1" }), "plan (pro)");
+  assertPage(await page("/app/settings/plan", { upgraded: "1" }), "plan (pro)");
   assert.equal((await settings()).plan, "pro", "billing.check agrees");
 
   await act("/app/templates", { intent: "create", type: "cod_confirm", lang: "en", name: "Pro extra", body: "Hi {name}: {confirm_link}" });
@@ -716,6 +801,8 @@ test("COD autopilot (Pro): expires unanswered orders on app load and by cron, ca
   await prisma.shopSettings.update({ where: { shop: SHOP }, data: { codProcessedAt: null } });
   let n = shopify.calls.length;
   assertPage(await page("/app"), "home runs the autopilot");
+  // It runs after the page is sent (so it never slows the page down): wait for it.
+  for (let i = 0; i < 40 && (await orderRow(o)).codStatus !== "no_reply"; i++) await new Promise((r) => setTimeout(r, 250));
   const expired = await orderRow(o);
   assert.equal(expired.codStatus, "no_reply", "expired automatically");
   assert.ok(expired.codExpiredAt);
@@ -728,6 +815,7 @@ test("COD autopilot (Pro): expires unanswered orders on app load and by cron, ca
   // Throttled: a second load within 10 minutes doesn't run it again.
   const { o: o2 } = await sentCodOrder(80);
   await page("/app");
+  await new Promise((r) => setTimeout(r, 1500));
   assert.equal((await orderRow(o2)).codStatus, "sent", "throttled");
 
   // The cron endpoint runs it for every Pro shop with the autopilot on (needs the secret).
@@ -754,11 +842,11 @@ test("COD autopilot (Pro): expires unanswered orders on app load and by cron, ca
 
 test("Plan: cancel goes back to Free and the widget branding returns", async () => {
   const n = shopify.calls.length;
-  await act("/app/plan", { intent: "cancel" });
+  await act("/app/settings/plan", { intent: "cancel" });
   assert.ok(shopify.calls.slice(n).some((c) => /appSubscriptionCancel/.test(c.query)), "appSubscriptionCancel called");
   assert.equal((await settings()).plan, "free");
   assert.equal(JSON.parse(shopify.state.metafields.at(-1).value).branding, true, "branding back on the storefront widget");
-  assertPage(await page("/app/plan"), "plan after cancel");
+  assertPage(await page("/app/settings/plan"), "plan after cancel");
   assertPage(await page("/app/settings"), "settings on Free (Pro fields disabled)");
 });
 

@@ -1,54 +1,34 @@
 /**
- * The app's pages, grouped by what the merchant is doing. Drives Shopify's admin menu (NavMenu),
- * the app's own left sidebar and the category label above each page title.
+ * The app's pages, as listed in Shopify's admin menu (NavMenu / s-app-nav). This is the only navigation:
+ * Shopify asks apps not to draw a second menu inside the page (Built for Shopify 4.1.4).
+ *
+ * Seven visible items at most (Shopify hides the rest behind "View more"), nouns, no icons or emoji.
+ * The daily COD workflow comes first so it is always one click away:
+ *   COD confirmation · Abandoned checkouts · Order updates · Templates · Widgets · Analytics · Settings
+ * Pages that used to be their own items live under their parent, so the parent stays highlighted:
+ *   Discounts → /app/widgets/discounts (they feed the discount banner), Plan → /app/settings/plan.
+ * Home ("/app", rel="home") is the app name in the admin and isn't listed as an item.
+ *
  * Labels are English keys translated with tr(); N_ marks them for the extractor.
- * `badge` names a count from the app loader's navCounts (work waiting on that page).
  */
 const N_ = (s) => s;
 
-export const NAV_SECTIONS = [
-  {
-    title: N_("Overview"),
-    items: [
-      { to: "/app", label: N_("Home"), icon: "⌂", end: true, badge: "alerts" },
-      { to: "/app/analytics", label: N_("Analytics"), icon: "📈" },
-    ],
-  },
-  {
-    title: N_("Orders"),
-    items: [
-      { to: "/app/cod", label: N_("COD confirmation"), icon: "✓", badge: "cod" },
-      { to: "/app/carts", label: N_("Abandoned checkouts"), icon: "🛒", badge: "carts" },
-      { to: "/app/updates", label: N_("Order updates"), icon: "📦", badge: "updates" },
-    ],
-  },
-  {
-    title: N_("Storefront"),
-    items: [
-      { to: "/app/widgets", label: N_("Widgets"), icon: "💬" },
-      { to: "/app/discounts", label: N_("Discounts"), icon: "％" },
-    ],
-  },
-  {
-    title: N_("Messages"),
-    items: [{ to: "/app/templates", label: N_("Message templates"), icon: "✉" }],
-  },
-  {
-    title: N_("Account"),
-    items: [
-      { to: "/app/settings", label: N_("Settings"), icon: "⚙" },
-      { to: "/app/plan", label: N_("Plan"), icon: "★" },
-    ],
-  },
+export const HOME = { to: "/app", label: N_("Home") };
+
+export const NAV_ITEMS = [
+  { to: "/app/cod", label: N_("COD confirmation") },
+  { to: "/app/carts", label: N_("Abandoned checkouts") },
+  { to: "/app/updates", label: N_("Order updates") },
+  { to: "/app/templates", label: N_("Templates") },
+  { to: "/app/widgets", label: N_("Widgets") },
+  { to: "/app/analytics", label: N_("Analytics") },
+  { to: "/app/settings", label: N_("Settings") },
 ];
 
-export const NAV_ITEMS = NAV_SECTIONS.flatMap((s) => s.items);
+export const MAX_NAV_ITEMS = 7;
 
-/** The section a path belongs to ("/app/cod?x" → Orders), for the label above the page title. */
-export function sectionFor(pathname) {
+/** The menu item a path belongs to ("/app/widgets/discounts" → Widgets), or null for Home. */
+export function navItemFor(pathname) {
   const path = String(pathname || "").replace(/\/$/, "") || "/app";
-  for (const s of NAV_SECTIONS) {
-    for (const i of s.items) if (i.end ? path === i.to : path === i.to || path.startsWith(`${i.to}/`)) return { section: s, item: i };
-  }
-  return null;
+  return NAV_ITEMS.find((i) => path === i.to || path.startsWith(`${i.to}/`)) || null;
 }

@@ -12,13 +12,15 @@ import { previewHtml, PREVIEW_PAGES } from "../lib/preview.js";
 import { formatPhone } from "../lib/phone.js";
 import { useT } from "../i18n/react.jsx";
 import { N_, LOCALES } from "../i18n/core.js";
-import { Page, Banner, TabBar, useTabState } from "../components/ui";
+import { Page, Banner, TabBar, useTabState, SaveBar } from "../components/ui";
+import { embedOn, embedActivation } from "../lib/embed.js";
 import { Section, Row, Text, NumberField, Toggle, Choice, ColorField, PageRules, Agents } from "../components/fields";
 import widgetJs from "../../widget-src/wa-widget.js?raw";
 import widgetCss from "../../extensions/pingzest-widgets/assets/wa-widget.css?raw";
 import { trackCall, flagOn } from "../posthog.server";
 import { useFlag } from "../components/flags.jsx";
 import { hasFeature, planOf } from "../lib/plans.js";
+import prisma from "../db.server";
 
 export const loader = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
@@ -34,6 +36,8 @@ export const loader = async ({ request }) => {
   const editor = `https://${shop}/admin/themes/current/editor`;
   return {
     config, syncedAt, syncError,
+    embed: embedOn(settings),
+    embedCheckedAt: settings.embedCheckedAt,
     // Store languages other than the main one; if Shopify can't tell us, offer the app's languages.
     languages: shopLocales
       ? shopLocales.filter((l) => !l.primary).map((l) => ({ code: l.locale, name: l.name, published: l.published }))
@@ -56,6 +60,11 @@ export const loader = async ({ request }) => {
 export const action = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const form = await request.formData();
+  if (form.get("intent") === "embedStatus") {
+    const now = new Date();
+    await prisma.shopSettings.update({ where: { shop: session.shop }, data: form.get("active") === "1" ? { embedActiveAt: now, embedCheckedAt: now } : { embedCheckedAt: now } });
+    return { embedChecked: true };
+  }
   if (form.get("intent") === "translate") {
     // Draft translations for the empty fields of one language; the merchant reviews, then saves.
     let texts = {};
@@ -204,10 +213,26 @@ export default function Widgets() {
     if (fetcher.state === "idle" && fetcher.data?.config) {
       setConfig(fetcher.data.config);
       setSaved(JSON.stringify(fetcher.data.config));
+      if (!fetcher.data.error) window.shopify?.toast?.show?.(tr("Widgets saved"));
     }
   }, [fetcher.state, fetcher.data]);
 
   const save = () => fetcher.submit({ config: JSON.stringify(config) }, { method: "post" });
+  // Live status of the app embed from App Bridge (read in the browser; the server keeps the last answer).
+  const embedFetcher = useFetcher({ key: "widgets-embed" });
+  const [embedLive, setEmbedLive] = useState(data.embed);
+  useEffect(() => {
+    const app = window.shopify?.app;
+    if (!app?.extensions) return;
+    let gone = false;
+    Promise.resolve(app.extensions()).then((list) => {
+      if (gone || !Array.isArray(list)) return;
+      const active = embedActivation(list)?.status === "active";
+      setEmbedLive(active);
+      embedFetcher.submit({ intent: "embedStatus", active: active ? "1" : "0" }, { method: "post" });
+    }).catch(() => {});
+    return () => { gone = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const result = fetcher.state === "idle" ? fetcher.data : null;
   const noNumber = !c.agents.some((a) => a.phone.replace(/\D/g, "").length >= 8);
   const discountMissing = d.enabled && !d.code;
@@ -221,22 +246,31 @@ export default function Widgets() {
 
   return (
     <Page
+      size="large"
       title={tr("Widgets")}
       subtitle={tr("Design your WhatsApp widgets and choose which store pages show them. The preview is your real widget.")}
       actions={
         <div className="wa-row-gap">
-          {status && <span className="wa-muted">{status}</span>}
-          <button type="button" className="wa-button wa-button--secondary" disabled={!dirty} onClick={() => setConfig(JSON.parse(saved))}>{tr("Discard")}</button>
-          <button type="button" className="wa-button wa-button--primary" disabled={!dirty || fetcher.state !== "idle"} onClick={save}>{tr("Save")}</button>
+          {status && <span className="wa-muted" data-save-status>{status}</span>}
+          <Link className="wa-button wa-button--secondary" to="/app/widgets/discounts">{tr("Discount codes")}</Link>
         </div>
       }
     >
+      <SaveBar
+        id="widgets-save-bar"
+        dirty={dirty}
+        saving={fetcher.state !== "idle"}
+        onSave={save}
+        onDiscard={() => setConfig(JSON.parse(saved))}
+      />
       {(result?.error || (!dirty && data.syncError)) && (
         <Banner tone="critical">{tr("Saved in the app, but your store didn't update: {error}. Try saving again.", { error: result?.error || data.syncError })}</Banner>
       )}
-      <Banner tone="info">
-        {tr("Widgets appear once the app embed is on.")} <a href={data.links.embed} target="_top">{tr("Turn on PingZest in your theme")}</a> {tr("(one time)")}
-      </Banner>
+      {!embedLive && (
+        <Banner tone="warning">
+          {tr("Your widgets aren't showing in your store yet: the PingZest app embed is off in your theme.")} <a href={data.links.embed} target="_top">{tr("Turn on PingZest in your theme")}</a> {tr("(one time)")}
+        </Banner>
+      )}
 
       <div className="wa-editor-layout">
         <div className="wa-editor-panel">
@@ -326,7 +360,7 @@ export default function Widgets() {
           {tab === "discount" && (
             <>
               <Toggle label={tr("Show the discount banner")} checked={d.enabled} onChange={set("discount.enabled")} />
-              <Section title={tr("Discount code")} aside={<Link to="/app/discounts">{tr("Create a code")}</Link>}>
+              <Section title={tr("Discount code")} aside={<Link to="/app/widgets/discounts">{tr("Create a code")}</Link>}>
                 {data.discounts.length > 0 && (
                   <Choice value={data.discounts.some((x) => x.code === d.code) ? d.code : ""} onChange={set("discount.code")}
                     options={data.discounts.map((x) => [x.code, x.label])} />

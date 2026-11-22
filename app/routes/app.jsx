@@ -1,15 +1,14 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Outlet, useLoaderData, useLocation, useRouteError } from "react-router";
+import { useEffect } from "react";
+import { Link, Outlet, useLoaderData, useRouteError } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { NavMenu } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { staffName } from "../lib/shop.js";
+import { getSettings } from "../models/settings.server";
 import { syncPlan } from "../models/billing.server";
-import { navCounts } from "../models/orders.server";
 import { processDueCod } from "../models/cod-loop.server";
-import { shopAlerts } from "../models/alerts.server";
-import { NAV_SECTIONS, NAV_ITEMS } from "../lib/nav.js";
+import { HOME, NAV_ITEMS } from "../lib/nav.js";
 import { adminLocale, dictionaryFor } from "../i18n/server.js";
 import { I18nProvider, useT } from "../i18n/react.jsx";
 import { dirOf } from "../i18n/core.js";
@@ -20,38 +19,55 @@ import styles from "../styles/app.css?url";
 
 export const links = () => [{ rel: "stylesheet", href: styles }];
 
+/** Work that must not hold up the page: it runs after the response is on its way. */
+function inBackground(label, fn) {
+  setTimeout(() => {
+    Promise.resolve().then(fn).catch((e) => console.error(`${label} failed`, e?.message));
+  }, 0);
+}
+
 export const loader = async ({ request }) => {
   const { session, billing, admin } = await authenticate.admin(request);
-  // Keeps the plan in step with Shopify billing (checked at most every 10 minutes; webhooks cover the rest).
-  const settings = await syncPlan(session.shop, billing, admin);
+  // The page renders from the stored settings. The plan is kept current by the subscription webhook,
+  // the Plan page (which checks Shopify before showing prices) and this background check (at most
+  // every 10 minutes); the Pro autopilot also runs on COD webhooks and the /cron/cod endpoint.
+  const settings = await getSettings(session.shop);
+  inBackground("plan check", () => syncPlan(session.shop, billing, admin));
+  inBackground("COD autopilot", () => processDueCod(session.shop, admin, { limit: 20 }));
   const locale = adminLocale({ request, session, settings });
   const profile = { plan: settings.plan || "free", app_locale: locale, country_code: settings.countryCode };
   identifyShop(session.shop, profile);
-  // Pro autopilot: expire unanswered COD orders that are due (throttled to every 10 minutes per shop).
-  await processDueCod(session.shop, admin, { limit: 20 }).catch((e) => console.error("COD autopilot failed", e?.message));
-  const [flags, queueCounts, alerts] = await Promise.all([
-    getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } }),
-    navCounts(session.shop, { delayMin: settings.abandonDelayMin, settings }).catch(() => ({})),
-    shopAlerts(session.shop, settings).catch(() => ({ total: 0 })),
-  ]);
-  const counts = { ...queueCounts, alerts: alerts.total };
-  return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan, counts };
+  const flags = await getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } });
+  return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan };
 };
 
+// The layout's data (language, flags, plan) only changes when a form is saved (e.g. the app language
+// in Settings), so moving between pages doesn't run it again.
+export const shouldRevalidate = ({ formMethod, defaultShouldRevalidate }) => (formMethod && formMethod !== "GET" ? defaultShouldRevalidate : false);
+
 export default function App() {
-  const { apiKey, locale, dict, flags, shop, plan, counts } = useLoaderData();
+  const { apiKey, locale, dict, flags, shop, plan } = useLoaderData();
   // Browser analytics and errors are grouped under the shop (no staff or customer details).
   useEffect(() => {
     if (typeof window !== "undefined" && window.posthog?.identify) window.posthog.identify(shop, { shop, plan });
   }, [shop, plan]);
+  // Page speed as Shopify measures it for Built for Shopify (LCP, CLS, INP): numbers only.
+  useEffect(() => {
+    const vitals = typeof window !== "undefined" ? window.shopify?.webVitals : null;
+    if (!vitals?.onReport) return undefined;
+    const off = vitals.onReport((report) => {
+      const metrics = Object.fromEntries((report?.metrics || []).map((m) => [m.name, Math.round(Number(m.value) * 1000) / 1000]));
+      window.posthog?.capture?.("web_vitals", { ...metrics, country: report?.country || null });
+    });
+    return typeof off === "function" ? off : undefined;
+  }, []);
   return (
     <AppProvider embedded apiKey={apiKey}>
       <I18nProvider locale={locale} dict={dict}>
         <FlagsProvider flags={flags}>
-          <div lang={locale} dir={dirOf(locale)} className="wa-shell">
+          <div lang={locale} dir={dirOf(locale)} className="wa-app">
             <Nav />
-            <Sidebar plan={plan} counts={counts || {}} />
-            <main className="wa-shell__main">
+            <main className="wa-app__main">
               <Outlet />
             </main>
           </div>
@@ -61,64 +77,16 @@ export default function App() {
   );
 }
 
-// app/lib/nav.js drives both menus: Shopify's admin menu (NavMenu) and the app's own left sidebar.
+/** Shopify's admin menu: the app's only navigation (app/lib/nav.js). */
 function Nav() {
   const tr = useT();
   return (
     <NavMenu>
+      <Link to={HOME.to} rel="home">{tr(HOME.label)}</Link>
       {NAV_ITEMS.map((i) => (
-        <Link key={i.to} to={i.to} rel={i.end ? "home" : undefined}>{tr(i.label)}</Link>
+        <Link key={i.to} to={i.to}>{tr(i.label)}</Link>
       ))}
     </NavMenu>
-  );
-}
-
-/** The app's own left sidebar: always there, so the app is easy to get around wherever it's opened. */
-function Sidebar({ plan, counts }) {
-  const tr = useT();
-  const { pathname, search } = useLocation();
-  const [open, setOpen] = useState(false);
-  useEffect(() => setOpen(false), [pathname]); // close the mobile menu after navigating
-  // Keep Shopify's embedded query params (shop, host, embedded) on every link.
-  const keep = new URLSearchParams(search);
-  ["id_token", "session", "hmac", "timestamp", "locale"].forEach((k) => keep.delete(k));
-  const qs = keep.toString() ? `?${keep}` : "";
-  return (
-    <>
-      <button type="button" className="wa-sidebar__toggle" aria-expanded={open} aria-controls="wa-sidebar" onClick={() => setOpen((v) => !v)}>
-        <span aria-hidden="true">☰</span> {tr("Menu")}
-      </button>
-      <nav id="wa-sidebar" className={`wa-sidebar${open ? " is-open" : ""}`} aria-label={tr("PingZest navigation")}
-        onClick={(e) => { if (e.target.closest("a")) setOpen(false); }}>
-        <div className="wa-sidebar__brand">PingZest</div>
-        {NAV_SECTIONS.map((section, si) => (
-          <div className="wa-sidebar__section" key={si}>
-            {section.title ? <div className="wa-sidebar__heading">{tr(section.title)}</div> : null}
-            <ul>
-              {section.items.map((i) => (
-                <li key={i.to}>
-                  <NavLink to={`${i.to}${qs}`} end={i.end} className={({ isActive }) => `wa-sidebar__link${isActive ? " is-active" : ""}`}>
-                    <span className="wa-sidebar__icon" aria-hidden="true">{i.icon}</span>
-                    <span className="wa-sidebar__label">{tr(i.label)}</span>
-                    {i.badge && counts[i.badge] > 0 ? (
-                      <span
-                        className={`wa-sidebar__badge${i.badge === "alerts" ? " wa-sidebar__badge--alert" : ""}`}
-                        aria-label={i.badge === "alerts" ? tr("{count} need attention", { count: counts[i.badge] }) : tr("{count} to send", { count: counts[i.badge] })}
-                      >
-                        {counts[i.badge] > 99 ? "99+" : counts[i.badge]}
-                      </span>
-                    ) : null}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        <Link to={`/app/plan${qs}`} className="wa-sidebar__plan">
-          {plan === "pro" ? tr("Pro plan") : tr("Free plan · Upgrade")}
-        </Link>
-      </nav>
-    </>
   );
 }
 

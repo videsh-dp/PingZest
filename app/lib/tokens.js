@@ -1,15 +1,16 @@
 import crypto from "node:crypto";
 
 /**
- * Short, unguessable token for the public confirm page: /c/<token>
- * 12 base64url characters = 72 bits of randomness.
+ * Unguessable token for the public confirm page: /c/<token>
+ * 22 base64url characters = 128 bits of randomness (the link stays short: no external shortener).
+ * Links sent before Nov 2026 used 12 characters (72 bits) and keep working until they expire.
  */
 export function generateToken() {
-  return crypto.randomBytes(9).toString("base64url");
+  return crypto.randomBytes(16).toString("base64url");
 }
 
 export function isValidTokenFormat(token) {
-  return typeof token === "string" && /^[A-Za-z0-9_-]{12}$/.test(token);
+  return typeof token === "string" && /^(?:[A-Za-z0-9_-]{22}|[A-Za-z0-9_-]{12})$/.test(token);
 }
 
 /** Confirm links stop working after this many days. */

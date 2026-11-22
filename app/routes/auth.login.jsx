@@ -39,5 +39,5 @@ export default function Auth() {
   const loaderData = useLoaderData();
   const actionData = useActionData();
   const errors = (actionData || loaderData).errors;
-  return <Landing errors={errors} defaultShop={loaderData.shop.replace(".myshopify.com", "")} locale={loaderData.locale} dict={loaderData.dict} />;
+  return <Landing showLogin errors={errors} defaultShop={loaderData.shop.replace(".myshopify.com", "")} locale={loaderData.locale} dict={loaderData.dict} />;
 }

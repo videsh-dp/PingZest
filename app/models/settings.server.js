@@ -23,6 +23,9 @@ export async function saveSettings(shop, form) {
   const tag = (v, fallback) => (String(v || "").trim().replace(/,/g, "") || fallback).slice(0, 40);
   const abandonDelayMin = Math.min(Math.max(parseInt(form.abandonDelayMin, 10) || 30, 10), 1440);
 
+  const logoUrl = String(form.logoUrl ?? "").trim();
+  if (logoUrl && !/^https:\/\/[^\s"'<>]+$/i.test(logoUrl)) errors.logoUrl = N_("Use an https:// link to an image.");
+
   if (Object.keys(errors).length) return { errors };
 
   const data = {
@@ -35,6 +38,8 @@ export async function saveSettings(shop, form) {
     cancelledTag: tag(form.cancelledTag, "wa-cod-cancelled"),
     abandonDelayMin,
   };
+  // Only forms that show the field send it (older API callers keep the saved logo).
+  if (form.logoUrl !== undefined) data.logoUrl = logoUrl.slice(0, 500);
   // COD follow-up (Settings → Orders). Checkboxes only count when that part of the form was sent.
   if (form.loopSettings) {
     const { remindHours, expireHours } = loopTimers({ codRemindHours: form.codRemindHours, codExpireHours: form.codExpireHours });

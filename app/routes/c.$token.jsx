@@ -43,22 +43,25 @@ async function load(token) {
   return { order, settings };
 }
 
-/** Pro extras need the live order from Shopify (address, payment link). */
+/**
+ * The live order from Shopify: the delivery address (shown to every customer, so they can check it;
+ * fixing it is Pro) and the payment link (Pro: pay online).
+ */
 async function liveOrder(order, settings) {
   const plan = planOf(settings);
   const wantPrepaid = hasFeature(plan, "prepaidOffer") && settings.prepaidEnabled;
-  const wantAddress = hasFeature(plan, "addressCheck") && settings.addressCheck;
-  if ((!wantPrepaid && !wantAddress) || order.expired || order.shippedAt || order.shopifyCancelledAt) return { wantPrepaid: false, wantAddress: false, live: null };
+  const canEditAddress = hasFeature(plan, "addressCheck") && settings.addressCheck;
+  if (order.expired || order.shippedAt || order.shopifyCancelledAt) return { wantPrepaid: false, wantAddress: false, canEditAddress: false, live: null };
   try {
     const { admin } = await unauthenticated.admin(order.shop);
-    return { wantPrepaid, wantAddress, live: await fetchOrderForConfirm(admin, order.orderGid), admin };
+    return { wantPrepaid, wantAddress: canEditAddress, canEditAddress, showAddress: true, live: await fetchOrderForConfirm(admin, order.orderGid), admin };
   } catch (e) {
     console.error("live order failed", e?.message);
-    return { wantPrepaid: false, wantAddress: false, live: null };
+    return { wantPrepaid: false, wantAddress: false, canEditAddress: false, live: null };
   }
 }
 
-function extras(order, settings, lang, { wantPrepaid, wantAddress, live }) {
+function extras(order, settings, lang, { wantPrepaid, showAddress, canEditAddress, live }) {
   const out = { prepaid: null, address: null };
   if (wantPrepaid && canOfferPrepaid(order, live)) {
     const subtotal = Number(live.currentSubtotalPriceSet?.shopMoney?.amount || 0);
@@ -71,8 +74,9 @@ function extras(order, settings, lang, { wantPrepaid, wantAddress, live }) {
     };
   }
   const a = live?.shippingAddress;
-  if (wantAddress && a && order.codStatus !== "cancelled") {
+  if (showAddress && a && order.codStatus !== "cancelled") {
     out.address = {
+      editable: Boolean(canEditAddress),
       address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", zip: a.zip || "",
       region: [a.province, a.country].filter(Boolean).join(", "), country: a.countryCodeV2 || "",
     };
@@ -84,6 +88,7 @@ function view(order, settings, lang) {
   return {
     lang,
     storeName: settings.storeName || order.shop.replace(".myshopify.com", ""),
+    logoUrl: /^https:\/\//.test(settings.logoUrl || "") ? settings.logoUrl : null,
     orderName: order.orderName,
     customerName: order.customerName,
     amount: formatCurrency(order.totalPrice, order.currency, lang),
@@ -97,7 +102,27 @@ function view(order, settings, lang) {
   };
 }
 
+/** A made-up order in the store's name, for "Send a test to yourself" on Home. Nothing is saved. */
+async function sampleView(request) {
+  const shop = new URL(request.url).searchParams.get("shop") || "";
+  if (!/^[a-z0-9][a-z0-9-]*\.myshopify\.com$/.test(shop)) return null;
+  const settings = await prisma.shopSettings.findUnique({ where: { shop } });
+  if (!settings) return null;
+  const lang = confirmLocale(request, settings);
+  const order = { shop, orderName: "#1001", customerName: "Priya", totalPrice: "1299", currency: "INR", itemsSummary: "1 × Sample product", codStatus: "sent" };
+  return {
+    ...view(order, settings, lang),
+    sample: true,
+    address: { editable: false, address1: "Flat 402, Sunrise Apartments, MG Road", address2: "Near City Mall", city: "Pune", zip: "411001", region: "Maharashtra, India", country: "IN" },
+  };
+}
+
 export const loader = async ({ params, request }) => {
+  if (params.token === "sample") {
+    const sample = await sampleView(request);
+    if (!sample) throw data({ lang: confirmLocale(request) }, { status: 404 });
+    return sample;
+  }
   const found = await load(params.token);
   if (!found) throw data({ lang: confirmLocale(request) }, { status: 404 });
   const lang = confirmLocale(request, found.settings);
@@ -106,6 +131,11 @@ export const loader = async ({ params, request }) => {
 };
 
 export const action = async ({ params, request }) => {
+  // The sample page answers like the real one but changes nothing.
+  if (params.token === "sample") {
+    const choice = (await request.formData()).get("choice");
+    return ["confirmed", "cancelled"].includes(choice) ? { ok: true, sampleChoice: choice } : data({ error: true }, { status: 400 });
+  }
   const found = await load(params.token);
   if (!found || found.order.expired || found.order.shippedAt || found.order.shopifyCancelledAt) return data({ error: true }, { status: 400 });
   const form = await request.formData();
@@ -193,18 +223,26 @@ export default function ConfirmPage() {
   const result = useActionData();
   const nav = useNavigation();
   const [editing, setEditing] = useState(false);
+  const [asking, setAsking] = useState(false); // "Cancel this order?" sheet
   const tx = textsFor(d.lang);
   const t = new Proxy({}, { get: (_, k) => tx(k) });
   const busy = nav.state !== "idle";
   const pendingChoice = nav.formData?.get("choice");
   const pendingIntent = nav.formData?.get("intent");
-  const status = pendingChoice || d.status;
+  const status = pendingChoice || result?.sampleChoice || d.status;
   const decided = status === "confirmed" || status === "cancelled";
+  const open = !d.expired && !d.locked && !d.cancelledInShopify;
 
   return (
     <main className="cf" lang={d.lang} dir={dirOf(d.lang)}>
       <div className="cf__card">
-        <p className="cf__store">{d.storeName}</p>
+        <header className="cf__brand">
+          {d.logoUrl
+            ? <img className="cf__logo" src={d.logoUrl} alt="" width="44" height="44" />
+            : <span className="cf__mono" aria-hidden="true">{(d.storeName || "?").trim().charAt(0).toUpperCase()}</span>}
+          <p className="cf__store">{d.storeName}</p>
+        </header>
+        {d.sample && <p className="cf__note" role="note">{t.sample}</p>}
 
         {d.expired ? (
           <Result icon="⏳" title={t.expired} sub={t.expiredSub} />
@@ -224,22 +262,48 @@ export default function ConfirmPage() {
         <dl className="cf__summary">
           <div><dt>{d.orderName}</dt><dd>{d.items}</dd></div>
           <div><dt>{t.total}</dt><dd className="cf__amount">{d.amount}</dd></div>
+          {d.address && !editing && (
+            <div className="cf__summary-addr">
+              <dt>{t.addrTitle}</dt>
+              <dd>
+                <address className="cf__address">
+                  {d.address.address1}{d.address.address2 && <>, {d.address.address2}</>}<br />
+                  {d.address.city} <bdi dir="ltr">{d.address.zip}</bdi>
+                </address>
+              </dd>
+            </div>
+          )}
         </dl>
+
+        {open && !decided && (
+          <ul className="cf__trust">
+            <li>{t.cash}</li>
+            <li>{t.noOtp}</li>
+          </ul>
+        )}
 
         {!d.expired && d.locked && <p className="cf__note">{t.locked}</p>}
         {!d.expired && !d.locked && d.cancelledInShopify && <p className="cf__note">{t.cancelledLocked}</p>}
 
-        {!d.expired && !d.locked && !d.cancelledInShopify && (
-          <Form method="post" className="cf__actions" onSubmit={(e) => {
-            const c = e.nativeEvent.submitter?.value;
-            if (c === "cancelled" && !window.confirm(t.confirmCancel)) e.preventDefault();
-          }}>
+        {open && (
+          <Form method="post" className="cf__actions">
             {decided && <p className="cf__change">{t.change}</p>}
-            {status !== "confirmed" && (
-              <button name="choice" value="confirmed" className="cf__btn cf__btn--yes" disabled={busy}>✅ {t.confirm}</button>
-            )}
-            {status !== "cancelled" && (
-              <button name="choice" value="cancelled" className="cf__btn cf__btn--no" disabled={busy}>❌ {t.cancel}</button>
+            {asking ? (
+              <div className="cf__sheet" role="alertdialog" aria-labelledby="cf-ask" aria-modal="false">
+                <p className="cf__h2" id="cf-ask">{t.confirmCancel}</p>
+                <button name="choice" value="cancelled" className="cf__btn cf__btn--danger" disabled={busy}>{t.cancelYes}</button>
+                <button type="button" className="cf__btn cf__btn--ghost" onClick={() => setAsking(false)} autoFocus>{t.cancelKeep}</button>
+              </div>
+            ) : (
+              <>
+                {status !== "confirmed" && (
+                  <button name="choice" value="confirmed" className="cf__btn cf__btn--yes" disabled={busy}>✅ {t.confirm}</button>
+                )}
+                {status !== "cancelled" && (
+                  // Works without JavaScript (submits straight away); with it, asks first.
+                  <button name="choice" value="cancelled" className="cf__btn cf__btn--no" disabled={busy} onClick={(e) => { e.preventDefault(); setAsking(true); }}>{t.cancel}</button>
+                )}
+              </>
             )}
           </Form>
         )}
@@ -258,21 +322,15 @@ export default function ConfirmPage() {
         )}
         {result?.error === "payFailed" && <p className="cf__note">{t.payFailed}</p>}
 
-        {d.address && (
+        {d.address?.editable && (
           <section className="cf__addr">
-            <h2 className="cf__h2">{t.addrTitle}</h2>
             {result?.addressSaved && <p className="cf__note cf__note--ok" role="status">{t.addrSaved}</p>}
             {result?.error === "addrFailed" && <p className="cf__note">{t.addrFailed}</p>}
             {!editing ? (
-              <>
-                <address className="cf__address">
-                  {d.address.address1}{d.address.address2 && <><br />{d.address.address2}</>}<br />
-                  {d.address.city} <bdi dir="ltr">{d.address.zip}</bdi>{d.address.region && <><br />{d.address.region}</>}
-                </address>
-                <button type="button" className="cf__link" onClick={() => setEditing(true)}>{t.addrEdit}</button>
-              </>
+              <button type="button" className="cf__link" onClick={() => setEditing(true)}>{t.addrEdit}</button>
             ) : (
               <Form method="post" className="cf__form" onSubmit={() => setEditing(false)}>
+                <h2 className="cf__h2">{t.addrTitle}</h2>
                 <input type="hidden" name="intent" value="address" />
                 <label>{t.addrLine1}<input name="address1" defaultValue={d.address.address1} required minLength={5} maxLength={120} autoComplete="address-line1" /></label>
                 <label>{t.addrLine2}<input name="address2" defaultValue={d.address.address2} maxLength={120} autoComplete="address-line2" /></label>

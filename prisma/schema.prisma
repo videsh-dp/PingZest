@@ -68,6 +68,14 @@ model ShopSettings {
   cancelRestock    Boolean  @default(true)  // restock items when PingZest cancels an order
   codProcessedAt   DateTime? // last time due COD work ran for this shop (throttle)
   rtoCost          Float?   // average cost of one returned COD parcel; null = default for the currency
+  // Home setup guide (docs/UI-TICKETS.md UI-05)
+  setupDismissedAt DateTime? // merchant closed the setup guide
+  embedActiveAt    DateTime? // App Bridge app.extensions() last reported the theme app embed as active
+  embedCheckedAt   DateTime? // when that status was last read (active or not)
+  embedManual      Boolean  @default(false) // merchant ticked "the embed is on" where the status can't be read
+  testSentAt       DateTime? // merchant sent the sample COD message to their own WhatsApp
+  // Customer confirm page
+  logoUrl          String   @default("") // optional https image shown above the order on the confirm page
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }

@@ -121,6 +121,8 @@ test("landing and login pages render, with the PostHog snippet", async () => {
   const html = await home.text();
   assert.match(html, /PingZest/);
   assert.match(html, /posthog\.init\("phc_ci"/);
+  assert.doesNotMatch(html, /name="shop"/, "no store-address form on the public page (App Store 2.3.1)");
+  assert.match(html, /Install from the Shopify App Store/);
 
   const login = await fetch(`${BASE}/auth/login`);
   assert.equal(login.status, 200);
