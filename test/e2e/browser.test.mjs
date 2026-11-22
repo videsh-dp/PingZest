@@ -56,9 +56,11 @@ async function newPage({ mobile = false } = {}) {
   });
   // WhatsApp links open in a new tab: answer them locally instead of going to wa.me.
   await context.route(/https:\/\/(wa\.me|api\.whatsapp\.com)\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>WhatsApp</title>" }));
-  // Shopify's CDN scripts (App Bridge, Polaris) are replaced by the stand-in above.
+  // App Bridge is replaced by the stand-in above; Polaris web components (polaris.js) load for real, so the
+  // screenshots show real Polaris rendering.
   await context.route("https://cdn.shopify.com/**", (route) => {
     const u = route.request().url();
+    if (/polaris/.test(u)) return route.continue();
     if (u.endsWith(".js")) return route.fulfill({ status: 200, contentType: "application/javascript", body: "/* stubbed in e2e */" });
     if (u.endsWith(".css")) return route.fulfill({ status: 200, contentType: "text/css", body: "" });
     return route.abort();
@@ -132,7 +134,8 @@ test("every page opens without errors; no second menu inside the app", async () 
   for (const [label, path] of PAGES) {
     await page.goto(app.adminUrl(path), { waitUntil: "networkidle" });
     await page.waitForTimeout(300);
-    const heading = await page.locator("h1").first().innerText().catch(() => "(no heading)");
+    const heading = (await page.locator("s-page").first().getAttribute("heading").catch(() => null)) || "(no heading)";
+    assert.ok(await page.evaluate(() => Boolean(customElements.get("s-page"))), `${label}: Polaris web components loaded`);
     console.log(`  ${label}: url=${new URL(page.url()).pathname} heading=${JSON.stringify(heading)}`);
     assert.equal(await page.locator(".wa-sidebar, .wa-sidebar__toggle").count(), 0, `${label}: no in-app sidebar`);
     const body = await page.locator("body").innerText();
@@ -142,7 +145,7 @@ test("every page opens without errors; no second menu inside the app", async () 
   }
   // Sub-pages have a breadcrumb back to their menu item.
   await page.goto(app.adminUrl("/app/settings/plan"), { waitUntil: "networkidle" });
-  await page.locator(".wa-breadcrumb").getByRole("link", { name: /Settings/ }).click();
+  await page.locator('s-link[slot="breadcrumb-actions"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/settings");
   assert.deepEqual(problems, [], "no page, hydration or console errors");
   await page.context().close();
@@ -208,7 +211,7 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   await page.waitForLoadState("networkidle");
 
   // Send & next: one primary button opens WhatsApp for the oldest order and records it.
-  const next = page.locator("[data-send-next]");
+  const next = page.locator("s-button[data-send-next]");
   const firstId = await next.getAttribute("data-send-next");
   const [popup] = await Promise.all([page.waitForEvent("popup"), next.click()]);
   await popup.close();
@@ -216,7 +219,7 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   for (let i = 0; i < 20 && !(await prisma.order.findUnique({ where: { id: firstId } })).codSentAt; i++) await page.waitForTimeout(250);
   assert.ok((await prisma.order.findUnique({ where: { id: firstId } })).codSentAt, "first order marked sent");
   await page.waitForLoadState("networkidle");
-  const secondId = await page.locator("a[data-send-next]").getAttribute("data-send-next");
+  const secondId = await page.locator("s-button[data-send-next]").getAttribute("data-send-next");
   assert.notEqual(secondId, firstId, "moves on to the next order");
   await shoot(page, "cod-send-next");
 
@@ -247,9 +250,9 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   const events = await page.locator("[data-timeline] [data-event]").evaluateAll((els) => els.map((e) => e.dataset.event));
   assert.deepEqual(events.slice(0, 1), ["created"]);
   assert.ok(events.includes("sent"), `timeline shows the send (${events})`);
-  assert.ok(await page.getByRole("link", { name: "Open in Shopify" }).count());
+  assert.ok(await page.locator("s-button[data-open-shopify]").count(), "Open in Shopify");
   await shoot(page, "cod-timeline");
-  await page.locator(".wa-breadcrumb a").click();
+  await page.locator('s-link[slot="breadcrumb-actions"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/cod");
   assert.deepEqual(problems, []);
   await page.context().close();
@@ -322,7 +325,7 @@ test("Widgets, templates and discounts use the save bar; editors are pages with 
   await page.locator(".wa-tpl-row").first().click();
   await page.waitForURL((u) => /^\/app\/templates\/[a-f0-9]{24}$/.test(new URL(u).pathname));
   await page.waitForLoadState("networkidle");
-  assert.ok(await page.locator(".wa-breadcrumb").getByRole("link", { name: /Message templates/ }).count(), "breadcrumb back to the list");
+  assert.match(await page.locator('s-link[slot="breadcrumb-actions"]').innerText(), /Message templates/, "breadcrumb back to the list");
   await page.locator("textarea").fill("Hi {name}, please confirm {order_no}: {confirm_link}");
   await bar.waitFor();
   await shoot(page, "template-editor");
@@ -332,7 +335,7 @@ test("Widgets, templates and discounts use the save bar; editors are pages with 
   await page.locator("dialog[open]").getByRole("button", { name: "Cancel" }).click();
 
   await page.goto(app.adminUrl("/app/widgets/discounts"), { waitUntil: "networkidle" });
-  await page.getByRole("link", { name: "Create discount" }).first().click();
+  await page.locator('s-button[slot="primary-action"]').click();
   await page.waitForURL((u) => new URL(u).pathname === "/app/widgets/discounts/new");
   await page.waitForLoadState("networkidle");
   await page.locator('input[name="code"]').fill("BROWSER15");
@@ -355,7 +358,7 @@ test("on a phone: no menu button, tabs on one line, Send & next within thumb rea
   await page.goto(app.adminUrl("/app/cod"), { waitUntil: "networkidle" });
   const tabs = await page.locator(".wa-tabs").boundingBox();
   assert.ok(tabs.height < 60, `tabs stay on one line (${tabs.height}px)`);
-  const send = page.locator("a[data-send-next]");
+  const send = page.locator("s-button[data-send-next]");
   if (await send.count()) {
     const box = await send.boundingBox();
     assert.ok(box.y + box.height > 844 - 80, `Send & next at the bottom (${box.y})`);

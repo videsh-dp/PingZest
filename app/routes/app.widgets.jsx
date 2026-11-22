@@ -249,12 +249,8 @@ export default function Widgets() {
       size="large"
       title={tr("Widgets")}
       subtitle={tr("Design your WhatsApp widgets and choose which store pages show them. The preview is your real widget.")}
-      actions={
-        <div className="wa-row-gap">
-          {status && <span className="wa-muted" data-save-status>{status}</span>}
-          <Link className="wa-button wa-button--secondary" to="/app/widgets/discounts">{tr("Discount codes")}</Link>
-        </div>
-      }
+      secondaryActions={[{ label: tr("Discount codes"), to: "/app/widgets/discounts" }]}
+      actions={status ? <span className="wa-muted" data-save-status>{status}</span> : null}
     >
       <SaveBar
         id="widgets-save-bar"

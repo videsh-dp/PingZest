@@ -2,7 +2,7 @@ import { Link, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { listDiscounts, createDiscount, toggleDiscount, removeDiscount } from "../models/discounts.server";
 import { getWidgetConfig } from "../models/widgets.server";
-import { Page, Card, EmptyState, ActionButton, ListView, TabBar, useTabState } from "../components/ui";
+import { Page, Card, Badge, EmptyState, ActionButton, ListView, TabBar, useTabState } from "../components/ui";
 import prisma from "../db.server";
 import { useT } from "../i18n/react.jsx";
 import { toId } from "../lib/ids.js";
@@ -57,14 +57,14 @@ export default function Discounts() {
       render: (d) => (
         <>
           <strong className="wa-code">{d.code}</strong>
-          {bannerCode === d.code && <div><span className="wa-badge wa-badge--info">{tr("In banner")}</span></div>}
+          {bannerCode === d.code && <div><Badge tone="info">{tr("In banner")}</Badge></div>}
           {bannerCode === d.code && !d.active && <p className="wa-warn">{tr("Paused but still in the banner: shoppers will see a code that doesn't work.")}</p>}
         </>
       ),
     },
     { key: "offer", label: tr("Offer"), render: (d) => (<>{offer(d)}<div className="wa-muted">{limits(d)}</div></>) },
     { key: "uses", label: tr("Orders"), render: (d) => d.uses },
-    { key: "status", label: tr("Status"), render: (d) => <span className={`wa-badge wa-badge--${d.active ? "success" : "neutral"}`}>{d.active ? tr("Active") : tr("Paused")}</span> },
+    { key: "status", label: tr("Status"), render: (d) => <Badge tone={d.active ? "success" : "neutral"}>{d.active ? tr("Active") : tr("Paused")}</Badge> },
     {
       key: "actions", label: tr("Actions"), align: "right",
       render: (d) => (
@@ -84,7 +84,7 @@ export default function Discounts() {
       backTo={{ to: "/app/widgets", label: tr("Widgets") }}
       subtitle={tr("Create discount codes in your Shopify store and show them in the discount banner. Shoppers apply them in one tap.")}
       size="large"
-      actions={<Link className="wa-button wa-button--primary" to="/app/widgets/discounts/new">{tr("Create discount")}</Link>}
+      primaryAction={{ label: tr("Create discount"), to: "/app/widgets/discounts/new" }}
       tabs={
         <TabBar
           label={tr("Discount codes")}

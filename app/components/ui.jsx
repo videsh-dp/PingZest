@@ -9,42 +9,85 @@ import { formatWhatsApp } from "../lib/whatsapp-format.js";
 import { useT } from "../i18n/react.jsx";
 import { LOCALES, N_ } from "../i18n/core.js";
 
-/**
- * Every page has the same anatomy: (back link) → title → one-line explanation → page actions,
- * then optional tabs, then the content. Shopify's admin menu shows where the merchant is, so the
- * page repeats no navigation of its own.
- *   backTo: { to, label } for sub-pages (an editor, Plan, Discounts), shown as a breadcrumb.
- *   size: "large" for lists and dashboards, "small" for forms such as Settings.
+/*
+ * Built on Polaris web components (s-page, s-section, s-banner, s-badge, s-table, s-button…), which
+ * Shopify's AppProvider already loads (polaris.js from cdn.shopify.com). React 18 passes props to custom
+ * elements as attributes, so: strings only, `class` (not className), and `undefined` to leave out a
+ * boolean attribute (false would be the string "false", which counts as present).
  */
-export function Page({ title, subtitle, actions, tabs, children, backTo, size }) {
-  const tr = useT();
+
+/** An attribute that is either present ("") or absent. */
+export const flag = (on) => (on ? "" : undefined);
+
+/**
+ * A button in the page header (s-page slots). `to` navigates inside the app, `href` + `target` opens a
+ * link, `onClick` runs an action. Other data-* props are passed through.
+ */
+function PageButton({ slot, variant, label, to, href, target, onClick, icon, tone, disabled, className, ...rest }) {
+  const navigate = useNavigate();
   return (
-    <div className={`wa-page${size ? ` wa-page--${size}` : ""}`}>
-      {backTo && (
-        <nav className="wa-breadcrumb" aria-label={tr("Breadcrumb")}>
-          <Link to={backTo.to} className="wa-breadcrumb__link"><span aria-hidden="true">←</span> {backTo.label}</Link>
-        </nav>
-      )}
-      <div className="wa-page__head">
-        <div>
-          <h1 className="wa-page__title">{title}</h1>
-          {subtitle && <p className="wa-page__subtitle">{subtitle}</p>}
-        </div>
-        {actions && <div className="wa-page__actions">{actions}</div>}
-      </div>
-      {tabs}
-      {children}
-    </div>
+    <s-button
+      slot={slot}
+      variant={variant}
+      tone={tone}
+      icon={icon}
+      href={to || href}
+      target={target}
+      disabled={flag(disabled)}
+      class={className}
+      onClick={(e) => {
+        if (to) { e.preventDefault(); navigate(to); }
+        onClick?.(e);
+      }}
+      {...rest}
+    >
+      {label}
+    </s-button>
   );
 }
 
-export function Card({ title, children, footer, className = "" }) {
+/**
+ * Every page: s-page with the heading, an optional breadcrumb back to the menu item it belongs to, one
+ * primary action and up to three secondary actions in the header; then the explanation, tabs and content.
+ *   backTo: { to, label }   primaryAction / secondaryActions: { label, to | href | onClick, … }
+ *   size: "large" for lists and dashboards, "small" for forms such as Settings.
+ *   actions: extra content shown under the heading (e.g. a save status).
+ */
+export function Page({ title, subtitle, actions, primaryAction, secondaryActions = [], tabs, children, backTo, size }) {
+  const navigate = useNavigate();
+  const inline = size === "large" ? "large" : size === "small" ? "small" : "base";
   return (
-    <section className={`wa-card ${className}`}>
-      {title && <h2 className="wa-card__title">{title}</h2>}
+    <s-page heading={title} inlineSize={inline} class={`wa-page${size ? ` wa-page--${size}` : ""}`}>
+      {backTo && (
+        <s-link slot="breadcrumb-actions" href={backTo.to} onClick={(e) => { e.preventDefault(); navigate(backTo.to); }} data-breadcrumb>
+          {backTo.label}
+        </s-link>
+      )}
+      {primaryAction && <PageButton slot="primary-action" variant="primary" {...primaryAction} />}
+      {secondaryActions.filter(Boolean).slice(0, 3).map((a, i) => <PageButton key={a.key || i} slot="secondary-actions" variant="secondary" {...a} />)}
+      {(subtitle || actions) && (
+        <div className="wa-page__head">
+          {subtitle && <p className="wa-page__subtitle">{subtitle}</p>}
+          {actions && <div className="wa-page__actions">{actions}</div>}
+        </div>
+      )}
+      {tabs}
       {children}
-      {footer && <div className="wa-card__footer">{footer}</div>}
-    </section>
+    </s-page>
+  );
+}
+
+/** A card: s-section (with a heading). `flush` removes the padding, for lists. */
+export function Card({ title, children, footer, className = "", id, flush = false }) {
+  const plain = typeof title === "string";
+  return (
+    <div className={`wa-sec ${className}`} id={id}>
+      <s-section heading={plain ? title : undefined} padding={flush || className.includes("wa-card--list") ? "none" : undefined}>
+        {title && !plain && <s-heading>{title}</s-heading>}
+        {children}
+        {footer && <div className="wa-card__footer">{footer}</div>}
+      </s-section>
+    </div>
   );
 }
 
@@ -60,16 +103,20 @@ export function Stat({ label, value, hint, to }) {
 }
 
 const TONES = {
-  pending: "attention", sent: "info", confirmed: "success", cancelled: "critical", no_reply: "neutral",
+  pending: "warning", sent: "info", confirmed: "success", cancelled: "critical", no_reply: "neutral",
   dismissed: "neutral", recovered: "success",
 };
 const LABELS = {
   pending: N_("To send"), sent: N_("Waiting"), confirmed: N_("Confirmed"), cancelled: N_("Cancelled"), no_reply: N_("No reply"),
   dismissed: N_("Dismissed"), recovered: N_("Recovered"),
 };
+/** Polaris badge. tone: info | success | warning | critical | neutral. */
+export function Badge({ tone = "neutral", children }) {
+  return <s-badge tone={tone === "neutral" ? undefined : tone === "attention" ? "warning" : tone}>{children}</s-badge>;
+}
 export function StatusBadge({ status }) {
   const tr = useT();
-  return <span className={`wa-badge wa-badge--${TONES[status] || "neutral"}`}>{LABELS[status] ? tr(LABELS[status]) : status}</span>;
+  return <Badge tone={TONES[status] || "neutral"}>{LABELS[status] ? tr(LABELS[status]) : status}</Badge>;
 }
 
 /**
@@ -221,7 +268,7 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
         <div className="wa-list__toolbar">
           {hasRows && searchText ? (
             <label className="wa-search">
-              <span className="wa-search__icon" aria-hidden="true">⌕</span>
+              <span className="wa-search__icon" aria-hidden="true"><s-icon type="search" size="small" /></span>
               <input
                 type="search"
                 className="wa-input wa-search__input"
@@ -304,8 +351,10 @@ export function EmptyState({ title, children, icon, action }) {
   );
 }
 
-export function Banner({ tone = "info", children }) {
-  return <div className={`wa-banner wa-banner--${tone}`}>{children}</div>;
+/** Polaris banner. One per page at most (Built for Shopify 4.3.4). tone: info | success | warning | critical. */
+export function Banner({ tone = "info", heading, children }) {
+  const t = tone === "attention" ? "warning" : tone;
+  return <s-banner tone={t} heading={heading}>{children}</s-banner>;
 }
 
 /**
@@ -405,7 +454,7 @@ export function ConfirmModal({ open, title, children, confirmLabel, cancelLabel,
         <div className="wa-modal__box" role="document">
           <div className="wa-modal__head">
             <h2 className="wa-modal__title">{title}</h2>
-            <button type="button" className="wa-icon-button" onClick={onCancel} aria-label={tr("Close")}><span aria-hidden="true">×</span></button>
+            <button type="button" className="wa-icon-button" onClick={onCancel} aria-label={tr("Close")}><s-icon type="x" /></button>
           </div>
           <div className="wa-modal__body">{children}</div>
           <div className="wa-modal__foot">
@@ -601,10 +650,10 @@ export function SetupGuide({ title, intro, steps, onDismiss }) {
         </div>
         <div className="wa-guide__tools">
           <button type="button" className="wa-icon-button" onClick={toggle} aria-expanded={!collapsed} aria-controls="wa-guide-steps" aria-label={collapsed ? tr("Show steps") : tr("Hide steps")}>
-            <span aria-hidden="true" className={`wa-chevron${collapsed ? "" : " is-open"}`} />
+            <s-icon type={collapsed ? "chevron-down" : "chevron-up"} />
           </button>
           <button type="button" className="wa-icon-button" onClick={onDismiss} aria-label={tr("Dismiss the setup guide")} data-dismiss-setup>
-            <span aria-hidden="true">×</span>
+            <s-icon type="x" />
           </button>
         </div>
       </div>

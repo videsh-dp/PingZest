@@ -213,7 +213,7 @@ test("Templates: seeded, create/update/duplicate/default/delete, and the Free li
   const editor = await page(`/app/templates/${c2.id}`);
   assertPage(editor, "template editor page");
   assert.match(editor.html, /Custom 2/);
-  assert.match(editor.html, /wa-breadcrumb/);
+  assert.match(editor.html, /slot="breadcrumb-actions"/);
   assertPage(await page("/app/templates/new", { type: "cod_reminder", lang: "hi", from: "standard" }), "new template page");
   assert.equal((await page("/app/templates/000000000000000000000000")).status, 404);
   const viaEditor = await act(`/app/templates/${c2.id}`, { intent: "update", id: c2.id, name: "Custom 2", body: `${body} !`, lang: "en" });

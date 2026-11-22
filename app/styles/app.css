@@ -590,3 +590,18 @@ ui-save-bar:defined .wa-savebar__label { display: none; }
 }
 .wa-dot--off { background: #b5b5b5; }
 .wa-dot--warn { background: #e8a200; }
+
+/* ===== Polaris web components (UI-17) ===== */
+/* s-page lays out the page (width, padding, header); our own page box only applies before it upgrades. */
+s-page.wa-page { display: block; max-width: none; margin: 0; padding: 0; }
+s-page.wa-page:not(:defined) { max-width: 1040px; margin: 0 auto; padding: 20px 20px 60px; }
+s-page.wa-page:not(:defined)::before { content: attr(heading); display: block; font-size: 20px; font-weight: 650; margin-bottom: 4px; }
+s-page:not(:defined) > [slot] { display: none; }
+.wa-sec { margin-bottom: 16px; }
+.wa-sec:last-child { margin-bottom: 0; }
+.wa-home .wa-sec { margin-bottom: 16px; }
+.wa-page__head { margin: 0 0 12px; }
+.wa-page__head .wa-page__subtitle { margin: 0; }
+s-banner { display: block; margin-bottom: 16px; }
+ui-save-bar:not(:defined)[data-open="true"] { margin: 16px 0 0; }
+.wa-search__icon s-icon { display: block; }

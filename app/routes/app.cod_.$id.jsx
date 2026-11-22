@@ -11,7 +11,7 @@ import { formatMoney } from "../lib/orders.js";
 import { buildTimeline } from "../lib/timeline.js";
 import { ACTION_LABELS, canCancelInShopify } from "../lib/cod-loop.js";
 import { hasFeature, planOf } from "../lib/plans.js";
-import { Page, Card, StatusBadge, ActionButton } from "../components/ui";
+import { Page, Card, StatusBadge, Badge, ActionButton } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 import { N_ } from "../i18n/core.js";
 
@@ -56,7 +56,7 @@ export default function CodOrder() {
       title={tr("Order {order}", { order: o.orderName })}
       subtitle={[o.customerName, o.amount, o.items].filter(Boolean).join(" · ")}
       backTo={{ to: "/app/cod", label: tr("COD confirmation") }}
-      actions={<a className="wa-button wa-button--secondary" href={`https://${shop}/admin/orders/${o.shopifyOrderId}`} target="_top">{tr("Open in Shopify")}</a>}
+      secondaryActions={[{ label: tr("Open in Shopify"), href: `https://${shop}/admin/orders/${o.shopifyOrderId}`, target: "_top", "data-open-shopify": "" }]}
     >
       <div className="wa-home">
         <div>
@@ -83,7 +83,7 @@ export default function CodOrder() {
         </div>
         <div>
           <Card title={tr("Status")}>
-            <p>{o.shopifyCancelled ? <span className="wa-badge wa-badge--neutral">{tr("Cancelled in Shopify")}</span> : <StatusBadge status={o.status} />}</p>
+            <p>{o.shopifyCancelled ? <Badge>{tr("Cancelled in Shopify")}</Badge> : <StatusBadge status={o.status} />}</p>
             {o.pincode && <p className="wa-muted">{tr("PIN {pincode}", { pincode: o.pincode })}</p>}
             <div className="wa-row-gap">
               {o.status !== "confirmed" && !o.shopifyCancelled && <ActionButton action="/app/cod" intent="status" id={o.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}

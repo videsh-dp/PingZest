@@ -6,7 +6,7 @@ import { customTemplateAllowance } from "../models/templates.server";
 import { riskTeaser } from "../models/risk.server";
 import { savedSummary } from "../models/rto.server";
 import { paybackReturns } from "../lib/rto.js";
-import { Page, Card, Banner, ConfirmModal } from "../components/ui";
+import { Page, Card, Badge, Banner, ConfirmModal } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 import { BILLING_PLANS, FEATURE_LIST, PRO_MONTHLY, PRO_YEARLY, TRIAL_DAYS, planOf } from "../lib/plans.js";
 
@@ -100,14 +100,14 @@ export default function PlanPage() {
             ))}
           </ul>
           {!isPro && <p className="wa-muted wa-small">{tr("Custom templates: {used} of {limit}", { used: d.allowance.used, limit: d.allowance.limit })}</p>}
-          {!isPro && <span className="wa-badge">{tr("Current plan")}</span>}
+          {!isPro && <Badge>{tr("Current plan")}</Badge>}
         </Card>
 
         <Card title={tr("Pro")} className={isPro ? "wa-plan wa-plan--pro is-current" : "wa-plan wa-plan--pro"}>
           <div className="wa-seg" role="group" aria-label={tr("Billing period")}>
             <button type="button" className={interval === "monthly" ? "is-active" : ""} onClick={() => setInterval("monthly")}>{tr("Monthly")}</button>
             <button type="button" className={interval === "yearly" ? "is-active" : ""} onClick={() => setInterval("yearly")}>
-              {tr("Yearly")} {saving > 0 && <span className="wa-badge wa-badge--success">{tr("Save {percent}%", { percent: saving })}</span>}
+              {tr("Yearly")} {saving > 0 && <Badge tone="success">{tr("Save {percent}%", { percent: saving })}</Badge>}
             </button>
           </div>
           <p className="wa-plan__price">
@@ -124,7 +124,7 @@ export default function PlanPage() {
           </ul>
           {isPro ? (
             <>
-              <span className="wa-badge wa-badge--success">{tr("Current plan")}</span>
+              <Badge tone="success">{tr("Current plan")}</Badge>
               {d.trialEndsAt && <p className="wa-muted wa-small">{tr("Free trial until {date}", { date: tr.date(d.trialEndsAt) })}</p>}
               <button type="button" className="wa-link wa-link--danger" disabled={busy} onClick={() => setCancelling(true)}>
                 {tr("Cancel Pro")}

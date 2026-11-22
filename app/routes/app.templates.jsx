@@ -8,7 +8,7 @@ import { listTemplates, customTemplateAllowance } from "../models/templates.serv
 import { templateAction } from "../models/template-actions.server";
 import prisma from "../db.server";
 import { TEMPLATE_TYPES, LANGUAGES, STARTER_TEMPLATES } from "../lib/templates.js";
-import { Page, Card, TabBar, EmptyState } from "../components/ui";
+import { Page, Card, Badge, TabBar, EmptyState } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 
 export const loader = async ({ request }) => {
@@ -51,7 +51,7 @@ export default function Templates() {
       size="large"
       title={tr("Message templates")}
       subtitle={tr("Write your own messages for each stage, then pick one in the queue when you send.")}
-      actions={allowance.canCreate ? <Link className="wa-button wa-button--primary" to={newLink("standard")}>{tr("Create template")}</Link> : null}
+      primaryAction={allowance.canCreate ? { label: tr("Create template"), to: newLink("standard") } : undefined}
       tabs={
         <TabBar
           label={tr("Message stage")}
@@ -80,7 +80,7 @@ export default function Templates() {
             {list.map((t) => (
               <li key={t.id}>
                 <Link className="wa-tpl-row" to={`/app/templates/${t.id}`}>
-                  <span className="wa-tpl-item__name">{t.name}{t.isDefault && <span className="wa-badge wa-badge--success">{tr("Default")}</span>}</span>
+                  <span className="wa-tpl-item__name">{t.name}{t.isDefault && <Badge tone="success">{tr("Default")}</Badge>}</span>
                   <span className="wa-tpl-item__body">{t.body.replace(/\s+/g, " ").slice(0, 140)}</span>
                   <span className="wa-muted wa-small">{t.sends ? tr.plural("Sent {count} time", "Sent {count} times", t.sends) : tr("Not used yet")}</span>
                 </Link>

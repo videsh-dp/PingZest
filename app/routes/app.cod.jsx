@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useFetcher, useLoaderData, useNavigate, useSearchParams } from "react-router";
 import { hasFeature, planOf } from "../lib/plans.js";
 import { REASONS } from "../lib/risk.js";
@@ -20,8 +20,8 @@ import prisma from "../db.server";
 import { toId } from "../lib/ids.js";
 import { N_ } from "../i18n/core.js";
 import {
-  Page, Card, Banner, Tabs, StatusBadge, SendButton, ActionButton, ActionMenu, MessagePreview, EmptyState,
-  useQueueTemplate, ListView, SendWith, WhatsAppIcon,
+  Page, Card, Banner, Tabs, StatusBadge, Badge, SendButton, ActionButton, ActionMenu, MessagePreview, EmptyState,
+  useQueueTemplate, ListView, SendWith,
 } from "../components/ui";
 
 export const loader = async ({ request }) => {
@@ -226,7 +226,6 @@ export default function CodQueue() {
   const confirmer = useFetcher({ key: "cod-confirm-key" });
   const next = runMode ? nextToSend(list.filter((r) => !r.shopifyCancelled && (!reminding || r.status === "sent")), done) : null;
   const remaining = runMode ? list.filter((r) => r.link && !done.has(r.id) && !r.shopifyCancelled).length : 0;
-  const nextRef = useRef(null);
   useEffect(() => { setDone(new Set()); setSentCount(0); }, [filter]);
   const recordNext = () => {
     if (!next) return;
@@ -235,27 +234,23 @@ export default function CodQueue() {
     setSentCount((n) => n + 1);
     setSelected(next.id);
   };
-  const sendNext = () => nextRef.current?.click(); // the link opens WhatsApp; its click handler records the send
+  const sendNext = () => { if (next?.link) { window.open(next.link, "_blank", "noopener"); recordNext(); } };
   const confirmSelected = (id) => confirmer.submit({ intent: "status", id: String(id), status: "confirmed" }, { method: "post" });
   useShortcuts({ rows: list, sendNext, selected, setSelected, confirmSelected });
   useEffect(() => {
     if (selected) document.querySelector(`[data-row="${selected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [selected]);
 
-  const sendNextButton = runMode && (next ? (
-    <a
-      ref={nextRef}
-      href={next.link}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="wa-button wa-button--primary wa-sendnext"
-      onClick={recordNext}
-      data-send-next={next.id}
-      aria-keyshortcuts="S"
-    >
-      <WhatsAppIcon /> {reminding ? tr("Remind next: {order}", { order: next.orderName }) : tr("Send next: {order}", { order: next.orderName })}
-    </a>
-  ) : list.length > 0 ? <span className="wa-muted" data-send-next="done">{tr("Everything in this list is sent")}</span> : null);
+  const sendNextAction = runMode && next ? {
+    label: reminding ? tr("Remind next: {order}", { order: next.orderName }) : tr("Send next: {order}", { order: next.orderName }),
+    href: next.link,
+    target: "_blank",
+    onClick: recordNext,
+    className: "wa-sendnext",
+    "data-send-next": next.id,
+    "aria-keyshortcuts": "S",
+  } : undefined;
+  const allSent = runMode && !next && list.length > 0;
 
   const columns = [
     {
@@ -291,9 +286,9 @@ export default function CodQueue() {
       key: "status", label: tr("Status"),
       render: (r) => (
         <>
-          {r.shopifyCancelled ? <span className="wa-badge wa-badge--neutral">{tr("Cancelled in Shopify")}</span>
-            : r.rto ? <span className="wa-badge wa-badge--critical">{tr("Returned (RTO)")}</span>
-            : r.status === "sent" && r.expiryDue ? <span className="wa-badge wa-badge--attention">{tr("Expiry due")}</span>
+          {r.shopifyCancelled ? <Badge>{tr("Cancelled in Shopify")}</Badge>
+            : r.rto ? <Badge tone="critical">{tr("Returned (RTO)")}</Badge>
+            : r.status === "sent" && r.expiryDue ? <Badge tone="warning">{tr("Expiry due")}</Badge>
             : <StatusBadge status={r.status} />}
           {r.risk && <RiskBadge risk={r.risk} />}
           {r.paidOnline && <div className="wa-success wa-small">{tr("Paid online")}</div>}
@@ -365,7 +360,8 @@ export default function CodQueue() {
       size="large"
       title={tr("COD confirmation")}
       subtitle={tr("Confirm Cash on Delivery orders before you ship. Customers tap the link in the message to confirm or cancel.")}
-      actions={sendNextButton}
+      primaryAction={sendNextAction}
+      actions={allSent ? <span className="wa-muted" data-send-next="done">{tr("Everything in this list is sent")}</span> : null}
       tabs={<Tabs tabs={tabs} label={tr("COD orders")} main={COD_MAIN_TABS} />}
     >
       {pro ? null : teaser?.high > 0 ? (
