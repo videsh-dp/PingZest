@@ -205,7 +205,7 @@ export function ActionMenu({ children, label }) {
       {!at && <span className="wa-rowmenu__items" hidden>{items}</span>}
       {at && createPortal(
         <div ref={menu} className="wa-menu wa-menu--floating" role="menu" style={{ top: at.top, right: at.right }}
-          onClick={() => setTimeout(() => { if (!document.querySelector("dialog[open]")) setAt(null); }, 0)}>{items}</div>,
+          onClick={(e) => { if (e.target.closest("a")) setAt(null); }}>{items}</div>,
         document.body,
       )}
     </span>
