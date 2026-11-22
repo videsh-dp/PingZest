@@ -655,13 +655,14 @@ export function useFormDirty(formRef, savedKey) {
     const f = formRef.current;
     if (!f) return undefined;
     // Polaris fields upgrade after hydration: take the snapshot once they are ready.
-    const take = () => { snap.current = read(); setDirty(false); };
+    let touched = false;
+    const take = () => { if (touched) return; snap.current = read(); setDirty(false); };
     take();
     const t = setTimeout(take, 300);
     if (typeof customElements !== "undefined") Promise.all(["s-checkbox", "s-text-field"].map((n) => customElements.whenDefined(n))).then(() => setTimeout(take, 0));
     // Listen in the capture phase (Polaris fields may not bubble their events) and read after the field
     // has handled the event and updated its value.
-    const check = () => setTimeout(() => setDirty(read().text !== snap.current.text), 0);
+    const check = (e) => { if (e?.isTrusted !== false) touched = true; setTimeout(() => setDirty(read().text !== snap.current.text), 0); };
     f.addEventListener("input", check, true);
     f.addEventListener("change", check, true);
     return () => { clearTimeout(t); f.removeEventListener("input", check, true); f.removeEventListener("change", check, true); };
