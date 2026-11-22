@@ -819,5 +819,19 @@
     "many": "أرسل {count} تحديثًا للشحن أو التوصيل",
     "other": "أرسل {count} تحديث شحن أو توصيل"
   },
-  "Opens WhatsApp for the oldest order, then moves to the next one.": "يفتح WhatsApp لأقدم طلب، ثم ينتقل إلى التالي."
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "يفتح WhatsApp لأقدم طلب، ثم ينتقل إلى التالي.",
+  "Clear selection": "مسح التحديد",
+  "Mark returned (RTO)": "وضع علامة مرتجع (RTO)",
+  "Select": "تحديد",
+  "Select all on this page": "تحديد الكل في هذه الصفحة",
+  "Selected orders": "الطلبات المحددة",
+  "{count} selected": "تم تحديد {count}",
+  "{count} order updated|{count} orders updated": {
+    "zero": "لم يتم تحديث أي طلب",
+    "one": "تم تحديث طلب واحد",
+    "two": "تم تحديث طلبين",
+    "few": "تم تحديث {count} طلبات",
+    "many": "تم تحديث {count} طلبًا",
+    "other": "تم تحديث {count} طلب"
+  }
 }

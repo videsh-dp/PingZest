@@ -792,5 +792,15 @@
     "one": "Envie {count} atualização de envio ou entrega",
     "other": "Envie {count} atualizações de envio ou entrega"
   },
-  "Opens WhatsApp for the oldest order, then moves to the next one.": "Abre o WhatsApp para o pedido mais antigo e passa para o próximo."
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "Abre o WhatsApp para o pedido mais antigo e passa para o próximo.",
+  "Clear selection": "Limpar seleção",
+  "Mark returned (RTO)": "Marcar como devolvido (RTO)",
+  "Select": "Selecionar",
+  "Select all on this page": "Selecionar tudo nesta página",
+  "Selected orders": "Pedidos selecionados",
+  "{count} selected": "{count} selecionados",
+  "{count} order updated|{count} orders updated": {
+    "one": "{count} pedido atualizado",
+    "other": "{count} pedidos atualizados"
+  }
 }

@@ -792,5 +792,15 @@
     "one": "{count} Versand- oder Liefer-Update senden",
     "other": "{count} Versand- oder Liefer-Updates senden"
   },
-  "Opens WhatsApp for the oldest order, then moves to the next one.": "Öffnet WhatsApp für die älteste Bestellung und geht dann zur nächsten."
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "Öffnet WhatsApp für die älteste Bestellung und geht dann zur nächsten.",
+  "Clear selection": "Auswahl aufheben",
+  "Mark returned (RTO)": "Als zurückgeschickt markieren (RTO)",
+  "Select": "Auswählen",
+  "Select all on this page": "Alle auf dieser Seite auswählen",
+  "Selected orders": "Ausgewählte Bestellungen",
+  "{count} selected": "{count} ausgewählt",
+  "{count} order updated|{count} orders updated": {
+    "one": "{count} Bestellung aktualisiert",
+    "other": "{count} Bestellungen aktualisiert"
+  }
 }

@@ -231,7 +231,7 @@ test("Home: setup guide ticks the theme step from App Bridge, can be dismissed a
 test("COD queue: search, More tab menu, Send & next, row menu with a modal, order timeline", async () => {
   const page = await newPage();
   await page.goto(app.adminUrl("/app/cod"), { waitUntil: "networkidle" });
-  const rows = page.locator(".wa-list__table tbody tr");
+  const rows = page.locator("s-table-body s-table-row");
   const before = await rows.count();
   assert.ok(before >= 3, `COD list has rows (${before})`);
 
@@ -269,12 +269,16 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   // Keyboard: J selects a row.
   await page.locator("body").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("j");
-  await page.locator(".wa-list__table tbody tr.is-selected").waitFor();
+  await page.locator("s-table-row.is-selected").waitFor();
 
   // Row menu → Mark cancelled asks in a modal; Cancel keeps the order, confirming cancels it.
-  const row = page.locator(`tr[data-row="${secondId}"]`);
-  await row.locator(".wa-rowmenu > summary").click();
-  await row.getByRole("button", { name: "Mark cancelled" }).click();
+  const row = page.locator(`s-table-row[data-row="${secondId}"]`);
+  const menuItem = async (name) => {
+    const menu = page.locator(".wa-menu--floating");
+    if (!(await menu.isVisible().catch(() => false))) await row.locator("[data-rowmenu]").click();
+    return menu.getByRole("button", { name });
+  };
+  await (await menuItem("Mark cancelled")).click();
   const modal = page.locator("dialog[open]");
   await modal.waitFor();
   assert.match(await modal.innerText(), /cancelled by the customer/);
@@ -283,10 +287,21 @@ test("COD queue: search, More tab menu, Send & next, row menu with a modal, orde
   await modal.waitFor({ state: "detached" }).catch(() => {});
   assert.equal(await page.locator("dialog[open]").count(), 0, "modal closed");
   assert.equal((await prisma.order.findUnique({ where: { id: secondId } })).codStatus, "pending", "nothing changed");
-  await row.getByRole("button", { name: "Mark cancelled" }).click();
+  await (await menuItem("Mark cancelled")).click();
   await page.locator("dialog[open]").getByRole("button", { name: "Mark cancelled" }).click();
   for (let i = 0; i < 20 && (await prisma.order.findUnique({ where: { id: secondId } })).codStatus !== "cancelled"; i++) await page.waitForTimeout(250);
   assert.equal((await prisma.order.findUnique({ where: { id: secondId } })).codStatus, "cancelled");
+  await page.waitForLoadState("networkidle");
+
+  // Bulk: select the remaining order and mark it confirmed.
+  const pick = page.locator("[data-pick]").first();
+  const pickedId = await pick.getAttribute("data-pick");
+  await pick.check();
+  await page.locator("[data-bulkbar]").waitFor();
+  await shoot(page, "cod-bulk");
+  await page.locator("[data-bulkbar]").getByRole("button", { name: "Mark confirmed" }).click();
+  for (let i = 0; i < 20 && (await prisma.order.findUnique({ where: { id: pickedId } })).codStatus !== "confirmed"; i++) await page.waitForTimeout(250);
+  assert.equal((await prisma.order.findUnique({ where: { id: pickedId } })).codStatus, "confirmed", "bulk mark confirmed");
 
   // Order timeline.
   await page.goto(app.adminUrl(`/app/cod/${firstId}`), { waitUntil: "networkidle" });

@@ -3,6 +3,7 @@
  * comfortably inside Shopify admin). Swap for Polaris components later if you like.
  */
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useBlocker, useFetcher, useNavigate, useSearchParams } from "react-router";
 import { composeMessage } from "../lib/compose.js";
 import { formatWhatsApp } from "../lib/whatsapp-format.js";
@@ -169,19 +170,44 @@ export function Tabs({ tabs, param = "filter", label, variant, main }) {
 
 /**
  * Row actions menu ("More actions"): the less common actions of a list row, so each row shows one
- * button plus this menu. Children are buttons or ActionButtons.
+ * button plus this menu. The menu opens at the end of <body> (fixed position), so a table never clips it.
  */
 export function ActionMenu({ children, label }) {
   const tr = useT();
+  const [at, setAt] = useState(null); // { top, right } when open
+  const btn = useRef(null);
+  const menu = useRef(null);
   const items = (Array.isArray(children) ? children.flat() : [children]).filter(Boolean);
+  useEffect(() => {
+    if (!at) return undefined;
+    const close = (e) => {
+      if (e.type === "keydown" && e.key !== "Escape") return;
+      if (e.type === "mousedown" && (menu.current?.contains(e.target) || btn.current?.contains(e.target) || e.target.closest?.("dialog"))) return;
+      setAt(null);
+    };
+    const onScroll = () => setAt(null);
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    window.addEventListener("resize", onScroll);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); window.removeEventListener("resize", onScroll); };
+  }, [at]);
   if (!items.length) return null;
+  const open = () => {
+    const r = btn.current.getBoundingClientRect();
+    setAt({ top: r.bottom + 4, right: Math.max(8, window.innerWidth - r.right) });
+  };
   return (
-    <details className="wa-rowmenu">
-      <summary className="wa-button wa-button--secondary wa-rowmenu__toggle" aria-label={label || tr("More actions")}>
+    <span className="wa-rowmenu">
+      <button ref={btn} type="button" className="wa-button wa-button--secondary wa-rowmenu__toggle" aria-label={label || tr("More actions")} aria-haspopup="menu" aria-expanded={Boolean(at)}
+        onClick={() => (at ? setAt(null) : open())} data-rowmenu>
         <span aria-hidden="true">•••</span>
-      </summary>
-      <div className="wa-menu wa-menu--end" role="menu">{items}</div>
-    </details>
+      </button>
+      {at && createPortal(
+        <div ref={menu} className="wa-menu wa-menu--floating" role="menu" style={{ top: at.top, right: at.right }}
+          onClick={() => setTimeout(() => { if (!document.querySelector("dialog[open]")) setAt(null); }, 0)}>{items}</div>,
+        document.body,
+      )}
+    </span>
   );
 }
 
@@ -253,14 +279,54 @@ export function TabBar({ tabs, current, onSelect, label }) {
  * columns: [{ key, label, render(row), align: "right", primary: true }]
  * searchText(row) → the text the search box matches (order, customer, phone…)
  */
-export function ListView({ rows, columns, rowKey = "id", searchText, searchPlaceholder, toolbar, empty, caption, selectedKey, onRowClick }) {
+export const PAGE_SIZE = 50;
+
+/**
+ * The list on every page, on Polaris s-table: search, "Showing X of Y", controls that act on the list
+ * (e.g. which template to send with), a table on desktop that Polaris turns into a list on a phone,
+ * pagination past PAGE_SIZE rows, optional bulk selection, and clear empty and no-match states.
+ *
+ * columns: [{ key, label, render(row), align: "right", primary: true }]
+ * searchText(row) → the text the search box matches (order, customer, phone…)
+ * bulkActions: [{ label, onRun(ids), tone }] → a checkbox per row and the actions for the selected rows.
+ */
+export function ListView({ rows, columns, rowKey = "id", searchText, searchPlaceholder, toolbar, empty, caption, selectedKey, onRowClick, bulkActions, canSelect }) {
   const tr = useT();
   const [q, setQ] = useState("");
+  const [pageNo, setPageNo] = useState(0);
+  const [picked, setPicked] = useState(() => new Set());
   const needle = q.trim().toLowerCase();
   const shown = useMemo(
     () => (needle && searchText ? rows.filter((r) => String(searchText(r) || "").toLowerCase().includes(needle)) : rows),
     [rows, needle, searchText],
   );
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const page = Math.min(pageNo, pages - 1);
+  const visible = shown.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  useEffect(() => { setPageNo(0); }, [needle]);
+  // Rows that left the list (sent, filtered) leave the selection too.
+  useEffect(() => {
+    setPicked((p) => {
+      const ids = new Set(rows.map((r) => r[rowKey]));
+      const next = new Set([...p].filter((id) => ids.has(id)));
+      return next.size === p.size ? p : next;
+    });
+  }, [rows, rowKey]);
+  const tableRef = useRef(null);
+  useEffect(() => {
+    const t = tableRef.current;
+    if (!t) return undefined;
+    const next = () => setPageNo((n) => n + 1);
+    const prev = () => setPageNo((n) => Math.max(0, n - 1));
+    t.addEventListener("nextpage", next);
+    t.addEventListener("previouspage", prev);
+    return () => { t.removeEventListener("nextpage", next); t.removeEventListener("previouspage", prev); };
+  });
+  const bulk = bulkActions?.length ? bulkActions : null;
+  const selectable = (r) => !canSelect || canSelect(r);
+  const pageIds = visible.filter(selectable).map((r) => r[rowKey]);
+  const allPicked = pageIds.length > 0 && pageIds.every((id) => picked.has(id));
+  const toggle = (id) => setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const hasRows = rows.length > 0;
   return (
     <div className="wa-list">
@@ -268,7 +334,7 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
         <div className="wa-list__toolbar">
           {hasRows && searchText ? (
             <label className="wa-search">
-              <span className="wa-search__icon" aria-hidden="true"><s-icon type="search" size="small" /></span>
+              <span className="wa-search__icon" aria-hidden="true"><s-icon type="search" /></span>
               <input
                 type="search"
                 className="wa-input wa-search__input"
@@ -283,6 +349,15 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
           {toolbar && <div className="wa-list__tools">{toolbar}</div>}
         </div>
       ) : null}
+      {bulk && picked.size > 0 && (
+        <div className="wa-bulkbar" role="region" aria-label={tr("Selected orders")} data-bulkbar>
+          <strong>{tr("{count} selected", { count: picked.size })}</strong>
+          {bulk.map((a) => (
+            <button key={a.label} type="button" className={`wa-button wa-button--${a.tone || "secondary"}`} onClick={() => { a.onRun([...picked]); setPicked(new Set()); }}>{a.label}</button>
+          ))}
+          <button type="button" className="wa-link" onClick={() => setPicked(new Set())}>{tr("Clear selection")}</button>
+        </div>
+      )}
       {!hasRows ? (
         empty
       ) : shown.length === 0 ? (
@@ -290,29 +365,40 @@ export function ListView({ rows, columns, rowKey = "id", searchText, searchPlace
           {tr("Try another search, or clear it.")}
         </EmptyState>
       ) : (
-        <table className="wa-table wa-list__table">
-          {caption && <caption className="wa-visually-hidden">{caption}</caption>}
-          <thead>
-            <tr>{columns.map((c) => <th key={c.key} scope="col" className={c.align === "right" ? "wa-right" : undefined}>{c.label}</th>)}</tr>
-          </thead>
-          <tbody>
-            {shown.map((r) => (
-              <tr
+        <s-table ref={tableRef} class="wa-list__table" paginate={flag(pages > 1)} hasNextPage={flag(page < pages - 1)} hasPreviousPage={flag(page > 0)} accessibilityLabel={caption}>
+          <s-table-header-row>
+            {bulk && (
+              <s-table-header listSlot="inline">
+                <input type="checkbox" className="wa-check__box" aria-label={tr("Select all on this page")} checked={allPicked}
+                  onChange={() => setPicked((p) => { const n = new Set(p); pageIds.forEach((id) => (allPicked ? n.delete(id) : n.add(id))); return n; })} />
+              </s-table-header>
+            )}
+            {columns.map((c) => (
+              <s-table-header key={c.key} listSlot={c.primary ? "primary" : c.key === "actions" ? "inline" : "labeled"} format={c.align === "right" ? "numeric" : undefined}>{c.label}</s-table-header>
+            ))}
+          </s-table-header-row>
+          <s-table-body>
+            {visible.map((r) => (
+              <s-table-row
                 key={r[rowKey]}
                 data-row={r[rowKey]}
-                className={selectedKey != null && selectedKey === r[rowKey] ? "is-selected" : undefined}
-                aria-selected={selectedKey != null ? selectedKey === r[rowKey] : undefined}
-                onClick={onRowClick ? (e) => { if (!e.target.closest("a, button, summary, input, select, textarea, dialog")) onRowClick(r); } : undefined}
+                class={selectedKey != null && selectedKey === r[rowKey] ? "is-selected" : undefined}
+                onClick={onRowClick ? (e) => { if (!e.target.closest?.("a, button, summary, input, select, textarea, dialog, s-button, s-link")) onRowClick(r); } : undefined}
               >
+                {bulk && (
+                  <s-table-cell>
+                    {selectable(r) && <input type="checkbox" className="wa-check__box" aria-label={tr("Select")} checked={picked.has(r[rowKey])} onChange={() => toggle(r[rowKey])} data-pick={r[rowKey]} />}
+                  </s-table-cell>
+                )}
                 {columns.map((c) => (
-                  <td key={c.key} data-label={c.label} className={[c.align === "right" ? "wa-right" : "", c.primary ? "wa-list__primary" : "", c.key === "actions" ? "wa-list__actions" : ""].filter(Boolean).join(" ") || undefined}>
+                  <s-table-cell key={c.key} class={c.key === "actions" ? "wa-list__actions" : undefined}>
                     {c.render ? c.render(r) : r[c.key]}
-                  </td>
+                  </s-table-cell>
                 ))}
-              </tr>
+              </s-table-row>
             ))}
-          </tbody>
-        </table>
+          </s-table-body>
+        </s-table>
       )}
     </div>
   );
@@ -435,13 +521,18 @@ export function ActionButton({ intent, id, extra = {}, children, tone = "seconda
 export function ConfirmModal({ open, title, children, confirmLabel, cancelLabel, destructive = false, onConfirm, onCancel, busy = false }) {
   const tr = useT();
   const ref = useRef(null);
+  // Rendered at the end of <body>, so the modal never inherits styles from where it was opened (a table
+  // cell, a menu). Only after the page is interactive, so server and browser HTML match.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   useEffect(() => {
     const d = ref.current;
     if (!d) return;
     if (open && !d.open) { if (typeof d.showModal === "function") d.showModal(); else d.setAttribute("open", ""); }
     if (!open && d.open) d.close();
-  }, [open]);
-  return (
+  }, [open, mounted]);
+  if (!mounted) return null;
+  return createPortal(
     <dialog
       ref={ref}
       className="wa-modal"
@@ -463,7 +554,8 @@ export function ConfirmModal({ open, title, children, confirmLabel, cancelLabel,
           </div>
         </div>
       )}
-    </dialog>
+    </dialog>,
+    document.body,
   );
 }
 

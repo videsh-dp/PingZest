@@ -610,3 +610,15 @@ ui-save-bar:not(:defined)[data-open="true"] { margin: 16px 0 0; }
   .wa-runbar .wa-sendnext { position: fixed; z-index: 15; inset-inline: 12px; bottom: 12px; min-height: 48px; font-size: 15px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25); }
   s-page.wa-page:has(.wa-sendnext) { padding-bottom: 84px; }
 }
+
+/* s-table lists */
+s-table-row.is-selected { background: #f1f6fe; box-shadow: inset 3px 0 0 var(--wa-focus); }
+s-table-cell.wa-list__actions .wa-actions { justify-content: flex-end; }
+.wa-menu--floating { position: fixed; inset-inline-start: auto; z-index: 1000; }
+.wa-menu--floating form { margin: 0; }
+.wa-menu--floating .wa-button { width: 100%; justify-content: flex-start; border: 0; box-shadow: none; background: transparent; font-weight: 500; min-height: 32px; }
+.wa-menu--floating .wa-button:hover { background: #f1f1f1; }
+.wa-menu--floating .wa-button--critical { color: var(--wa-critical); }
+.wa-menu--floating a.wa-menu__item { font-size: 13px; }
+.wa-bulkbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 16px; background: #f7f7f7; border-bottom: 1px solid var(--wa-border); }
+.wa-check__box { width: 16px; height: 16px; accent-color: #303030; cursor: pointer; }

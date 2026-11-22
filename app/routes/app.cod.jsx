@@ -101,6 +101,25 @@ export const action = async ({ request }) => {
   const { session, admin } = await authenticate.admin(request);
   const shop = session.shop;
   const form = Object.fromEntries(await request.formData());
+  // Bulk: mark several orders confirmed, or returned (RTO), in one go. Same rules as one at a time.
+  if (form.intent === "bulk") {
+    const ids = String(form.ids || "").split(",").map(toId).filter(Boolean).slice(0, 100);
+    const settings = await getSettings(shop);
+    const orders = await prisma.order.findMany({ where: { shop, isCod: true, id: { in: ids } } });
+    let done = 0;
+    for (const order of orders) {
+      if (order.shopifyCancelledAt) continue;
+      if (form.op === "confirmed" && order.codStatus !== "confirmed") {
+        const updated = await setCodStatus(shop, order.id, "confirmed", "merchant");
+        await applyCodOutcome(updated, { status: "confirmed", by: "merchant" }, admin, settings);
+        done += 1;
+      } else if (form.op === "rto" && !order.rtoAt && (order.shippedAt || order.codStatus === "confirmed")) {
+        await markRto(shop, order.id, true);
+        done += 1;
+      }
+    }
+    return { ok: true, bulk: done };
+  }
   const id = toId(form.id);
   if (!id) return { error: "Not found" };
 
@@ -237,6 +256,15 @@ export default function CodQueue() {
   const sendNext = () => { if (next?.link) { window.open(next.link, "_blank", "noopener"); recordNext(); } };
   const confirmSelected = (id) => confirmer.submit({ intent: "status", id: String(id), status: "confirmed" }, { method: "post" });
   useShortcuts({ rows: list, sendNext, selected, setSelected, confirmSelected });
+  const bulker = useFetcher({ key: "cod-bulk" });
+  const runBulk = (op) => (ids) => bulker.submit({ intent: "bulk", op, ids: ids.join(",") }, { method: "post" });
+  const bulkActions = filter === "confirmed"
+    ? [{ label: tr("Mark returned (RTO)"), onRun: runBulk("rto") }]
+    : filter === "cancelled" ? null
+    : [{ label: tr("Mark confirmed"), onRun: runBulk("confirmed") }];
+  useEffect(() => {
+    if (bulker.state === "idle" && bulker.data?.bulk != null) window.shopify?.toast?.show?.(tr.plural("{count} order updated", "{count} orders updated", bulker.data.bulk));
+  }, [bulker.state, bulker.data]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (selected) document.querySelector(`[data-row="${selected}"]`)?.scrollIntoView({ block: "nearest" });
   }, [selected]);
@@ -388,6 +416,8 @@ export default function CodQueue() {
           rows={list}
           columns={columns}
           caption={tr("COD orders")}
+          bulkActions={bulkActions}
+          canSelect={(r) => !r.shopifyCancelled}
           selectedKey={selected}
           onRowClick={(r) => setSelected(r.id)}
           searchText={(r) => `${r.orderName} ${r.customerName} ${r.phoneDisplay || ""} ${r.pincode || ""}`}

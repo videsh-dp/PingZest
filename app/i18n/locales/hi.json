@@ -791,5 +791,15 @@
     "one": "{count} शिपिंग या डिलीवरी अपडेट भेजें",
     "other": "{count} शिपिंग या डिलीवरी अपडेट भेजें"
   },
-  "Opens WhatsApp for the oldest order, then moves to the next one.": "सबसे पुराने ऑर्डर के लिए WhatsApp खोलता है, फिर अगले पर जाता है।"
+  "Opens WhatsApp for the oldest order, then moves to the next one.": "सबसे पुराने ऑर्डर के लिए WhatsApp खोलता है, फिर अगले पर जाता है।",
+  "Clear selection": "चुनाव हटाएँ",
+  "Mark returned (RTO)": "लौटा हुआ मार्क करें (RTO)",
+  "Select": "चुनें",
+  "Select all on this page": "इस पेज पर सब चुनें",
+  "Selected orders": "चुने गए ऑर्डर",
+  "{count} selected": "{count} चुने गए",
+  "{count} order updated|{count} orders updated": {
+    "one": "{count} ऑर्डर अपडेट हुआ",
+    "other": "{count} ऑर्डर अपडेट हुए"
+  }
 }

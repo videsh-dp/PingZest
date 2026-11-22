@@ -352,6 +352,24 @@ test("COD: merchant marks an order cancelled from the app → tags swapped in Sh
   for (const f of ["pending", "confirmed", "cancelled"]) assertPage(await page("/app/cod", { status: f }), `COD filter ${f}`);
 });
 
+test("COD: bulk mark confirmed and returned (RTO); cancelled-in-Shopify orders are skipped", async () => {
+  const made = [];
+  for (let i = 0; i < 2; i++) {
+    const o = codOrder();
+    shopify.state.orders.set(o.admin_graphql_api_id, {});
+    await webhook("/webhooks/orders", "orders/create", o);
+    made.push(await orderRow(o));
+  }
+  const n = shopify.calls.length;
+  const r = await act("/app/cod", { intent: "bulk", op: "confirmed", ids: made.map((m) => m.id).join(",") });
+  assert.equal(r.status, 200);
+  for (const m of made) assert.equal((await prisma.order.findUnique({ where: { id: m.id } })).codStatus, "confirmed");
+  assert.equal(shopify.calls.slice(n).filter((c) => c.op === "tagOrder").length, 2, "each order tagged");
+  await act("/app/cod", { intent: "bulk", op: "rto", ids: made.map((m) => m.id).join(",") });
+  for (const m of made) assert.ok((await prisma.order.findUnique({ where: { id: m.id } })).rtoAt, "marked returned");
+  for (const m of made) await act("/app/cod", { intent: "rto", id: m.id, on: "0" });
+});
+
 test("COD: an order without a phone in the webhook is fetched from Shopify", async () => {
   const o = codOrder({ phone: null, customer: { first_name: "Ravi" }, shipping_address: { first_name: "Ravi", city: "Delhi", zip: "110001", country_code: "IN" } });
   shopify.state.orders.set(o.admin_graphql_api_id, {
@@ -494,7 +512,7 @@ test("COD loop (Free): remind after 24h, expire by hand with the no-reply tag, c
   const noReplyTab = (await page("/app/cod", { filter: "no_reply" })).html;
   const card = noReplyTab.slice(noReplyTab.indexOf(o.name), noReplyTab.indexOf(o.name) + 4000);
   assert.match(card, /Cancelled in Shopify/);
-  assert.doesNotMatch(card.split("</tr>")[0], /Mark confirmed|Send again/, "no status or send buttons on a cancelled order");
+  assert.doesNotMatch(card.split("</s-table-row>")[0], /Mark confirmed|Send again/, "no status or send buttons on a cancelled order");
 
   const view = await (await fetch(`${BASE}/c/${row.confirmToken}?l=en`)).text();
   assert.match(view, /This order was cancelled/, "confirm page says it's cancelled");
