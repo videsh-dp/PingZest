@@ -112,6 +112,22 @@ jobs:
       - name: "End-to-end in the browser: every page, setup guide, Send & next, modals, save bar, phone layout, confirm page"
         run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e:browser
 
+      - name: "Walkthrough screenshots: Free and Pro flows for a store called Golibar (numbered JPEGs + walkthrough.json)"
+        run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run walkthrough
+
+      - name: Walkthrough screenshots (base64, for copying out of the log)
+        if: always()
+        run: |
+          for f in test/e2e/walkthrough/*.jpg test/e2e/walkthrough/walkthrough.json; do
+            [ -f "$f" ] || continue
+            n=0; base64 -w 4000 "$f" | while read -r chunk; do n=$((n+1)); echo "WALK $(basename "$f") $n $chunk"; done
+          done
+          true
+
+      - name: Walkthrough server log (on failure)
+        if: failure()
+        run: tail -200 /tmp/pingzest-walkthrough.log 2>/dev/null || true
+
       - name: Screenshots for review (small JPEGs, base64)
         if: always()
         run: |
@@ -137,6 +153,7 @@ jobs:
           path: |
             test/widgets/*.png
             test/e2e/screenshots/*.png
+            test/e2e/walkthrough/*
           if-no-files-found: ignore
 
   # Deploys main to your server after all tests pass. Turned on by setting the repository

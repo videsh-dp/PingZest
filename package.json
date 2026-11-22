@@ -20,6 +20,7 @@
     "prisma": "prisma",
     "test:e2e": "node --test --test-concurrency=1 test/e2e/admin.test.mjs",
     "test:e2e:browser": "node --test --test-concurrency=1 test/e2e/browser.test.mjs",
+    "walkthrough": "node --test --test-concurrency=1 test/e2e/walkthrough.test.mjs",
     "build:widget": "node scripts/build-widget.mjs"
   },
   "engines": {
