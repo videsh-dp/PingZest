@@ -181,15 +181,13 @@ export function ActionMenu({ children, label }) {
   useEffect(() => {
     if (!at) return undefined;
     const close = (e) => {
-      if (e.type === "keydown" && e.key !== "Escape") return;
+      if (e.type === "keydown" && (e.key !== "Escape" || document.querySelector("dialog[open]"))) return;
       if (e.type === "mousedown" && (menu.current?.contains(e.target) || btn.current?.contains(e.target) || e.target.closest?.("dialog"))) return;
       setAt(null);
     };
-    const onScroll = () => setAt(null);
     document.addEventListener("mousedown", close);
     document.addEventListener("keydown", close);
-    window.addEventListener("resize", onScroll);
-    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); window.removeEventListener("resize", onScroll); };
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
   }, [at]);
   if (!items.length) return null;
   const open = () => {
