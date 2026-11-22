@@ -370,6 +370,52 @@ test("COD loop (Free): remind after 24h, expire by hand with the no-reply tag, c
   assert.equal((await settings()).codHold, false);
 });
 
+
+/* ---------- returns: saved on returns, RTO facts, breakdowns (PZ-04..06) ---------- */
+
+test("Returns (Free): order facts saved, return cost setting, saved-on-returns headline, RTO mark; breakdowns stay Pro", async () => {
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS, rtoCost: "600" });
+  assert.equal((await settings()).rtoCost, 600);
+
+  const o = codOrder({ created_at: "2026-11-21T23:40:00+05:30", customer: { first_name: "Asha", phone: "+919800000001", orders_count: 1 }, phone: "+919800000001", discount_codes: [{ code: "WELCOME10" }] });
+  shopify.state.orders.set(o.admin_graphql_api_id, {});
+  await webhook("/webhooks/orders", "orders/create", o);
+  const row = await orderRow(o);
+  assert.equal(row.firstOrder, true, "first order from orders_count");
+  assert.equal(row.placedHour, 23, "hour in the store's time");
+  assert.equal(row.discountCodes, "WELCOME10");
+
+  // Without orders_count, the store's own orders decide.
+  const again = codOrder({ customer: { first_name: "Asha", phone: "+919800000001" }, phone: "+919800000001" });
+  await webhook("/webhooks/orders", "orders/create", again);
+  assert.equal((await orderRow(again)).firstOrder, false, "second order from the same phone");
+
+  const home = await page("/app");
+  assertPage(home, "home with savings");
+  assert.match(home.html, /Saved on returns/);
+  assert.match(home.html, /₹[\d,]+/, "amount in the store currency");
+
+  const r = await page("/app/analytics", { view: "returns" });
+  assertPage(r, "analytics returns (free)");
+  assert.match(r.html, /Parcels you didn(?:'|&#x27;|&#39;)t ship/);
+  assert.match(r.html, /Returns insights are on Pro/);
+  assert.doesNotMatch(r.html, /By PIN code/, "no breakdowns on Free");
+  assert.doesNotMatch(r.html, /"pincodes"/, "breakdown data never sent to a Free page");
+
+  await act("/app/cod", { intent: "status", id: row.id, status: "confirmed" });
+  await act("/app/cod", { intent: "rto", id: row.id, on: "1" });
+  assert.ok((await orderRow(o)).rtoAt, "marked returned");
+  assert.match((await page("/app/cod", { filter: "confirmed" })).html, /Not returned/);
+  await act("/app/cod", { intent: "rto", id: row.id, on: "0" });
+  assert.equal((await orderRow(o)).rtoAt, null, "undo");
+  await act("/app/cod", { intent: "rto", id: row.id, on: "1" });
+
+  const plan = await page("/app/plan");
+  assertPage(plan, "plan with savings");
+  assert.match(plan.html, /Zero markup/);
+  assert.match(plan.html, /saved you about/, "store's own savings on the Plan page");
+});
+
 /* ---------- abandoned checkouts ---------- */
 
 test("Abandoned checkouts: webhook → queue after the delay → send, dismiss; completed checkout leaves", async () => {
@@ -532,6 +578,17 @@ test("Pro: customer fixes the address and pays online with a discount (order edi
   assert.ok(paid.convertedToPrepaid, "converted to prepaid");
   assert.deepEqual(shopify.calls.slice(n).find((c) => c.op === "tagOrder")?.variables.tags, ["now-prepaid", "cod-yes"], "prepaid + confirmed tags (paying counts as confirming)");
   assertPage(await page("/app/analytics"), "analytics with prepaid stats");
+});
+
+test("Returns (Pro): breakdowns by PIN code, first order, coupon and hour, confirmed vs not, CSV export", async () => {
+  const r = await page("/app/analytics", { view: "returns", days: "90" });
+  assertPage(r, "analytics returns (pro)");
+  for (const text of ["Where returns come from", "Confirmed vs not confirmed", "First order vs repeat", "Order time", "Export CSV"]) {
+    assert.ok(r.html.includes(text), `returns page shows ${text}`);
+  }
+  assert.match(r.html, /First order/);
+  assert.match(r.html, /Used a coupon/);
+  assert.match(r.html, /Shipped without confirmation|Confirmed before shipping/);
 });
 
 test("COD autopilot (Pro): expires unanswered orders on app load and by cron, cancels + restocks; customer cancel cancels", async () => {

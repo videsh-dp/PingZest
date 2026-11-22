@@ -10,6 +10,7 @@ import { applyCodOutcome, expireOrder, cancelInShopify, releaseCodHold, holdCodO
 import { canCancelInShopify, nextStep, reminderWhere, isExpiryDue, parseActionError, ACTION_LABELS } from "../lib/cod-loop.js";
 import { COD_FILTERS } from "../lib/cod-filters.js";
 import { codRowData, templatesFor, pickLang } from "../models/messages.server";
+import { markRto } from "../models/rto.server";
 import { formatMoney } from "../lib/orders.js";
 import { useT } from "../i18n/react.jsx";
 
@@ -77,6 +78,7 @@ export const loader = async ({ request }) => {
       shopifyCancelled: Boolean(o.shopifyCancelledAt),
       canCancel: canCancelInShopify(o),
       shipped: Boolean(o.shippedAt),
+      rto: Boolean(o.rtoAt),
       actionError: o.actionError ? parseActionError(o.actionError) : null,
       ...codRowData(o, settings),
     })),
@@ -125,6 +127,10 @@ export const action = async ({ request }) => {
   }
   if (form.intent === "retry") {
     await retryAction(order, admin, settings);
+    return { ok: true };
+  }
+  if (form.intent === "rto") {
+    await markRto(shop, id, form.on === "1");
     return { ok: true };
   }
   if (form.intent === "dismissError") {
@@ -203,6 +209,7 @@ export default function CodQueue() {
           )}
           {r.held && <div><span className="wa-badge wa-badge--info">{tr("Fulfillment on hold")}</span></div>}
           {r.shopifyCancelled && <div><span className="wa-badge wa-badge--neutral">{tr("Cancelled in Shopify")}</span></div>}
+          {r.rto && <div><span className="wa-badge wa-badge--critical">{tr("Returned (RTO)")}</span></div>}
           {r.actionError && (
             <div className="wa-error wa-small" role="alert">
               {tr(ACTION_LABELS[r.actionError.kind] || ACTION_LABELS.other)}: {r.actionError.message}
@@ -236,6 +243,11 @@ export default function CodQueue() {
           )}
           {r.held && ["pending", "sent"].includes(r.status) && <ActionButton intent="release" id={r.id}>{tr("Release hold")}</ActionButton>}
           {holdOn && !r.held && !r.shipped && ["pending", "sent"].includes(r.status) && <ActionButton intent="hold" id={r.id}>{tr("Hold fulfillment")}</ActionButton>}
+          {["confirmed", "no_reply", "sent"].includes(r.status) && !r.shopifyCancelled && (
+            r.rto
+              ? <ActionButton intent="rto" id={r.id} extra={{ on: "0" }}>{tr("Not returned")}</ActionButton>
+              : (r.shipped || r.status === "confirmed") && <ActionButton intent="rto" id={r.id} extra={{ on: "1" }} confirmText={tr("Mark this parcel as returned to you (RTO)? It counts in Analytics → Returns.")}>{tr("Returned (RTO)")}</ActionButton>
+          )}
           {r.actionError && <ActionButton intent="retry" id={r.id}>{tr("Retry")}</ActionButton>}
           {r.actionError && <ActionButton intent="dismissError" id={r.id}>{tr("Dismiss")}</ActionButton>}
         </div>

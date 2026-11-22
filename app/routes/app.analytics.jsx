@@ -4,6 +4,10 @@ import { widgetAnalytics } from "../models/widgets.server";
 import { messageAnalytics } from "../models/orders.server";
 import { prepaidStats } from "../models/prepaid.server";
 import { riskTeaser } from "../models/risk.server";
+import { returnsAnalytics } from "../models/rto.server";
+import { getSettings } from "../models/settings.server";
+import { hasFeature, planOf } from "../lib/plans.js";
+import { HOUR_BANDS, MIN_PIN_ORDERS, breakdownCsv } from "../lib/rto.js";
 import { KINDS } from "../lib/message-stats.js";
 import { PAGE_TYPES } from "../lib/widget-config.js";
 import { Page, Card, Stat, Tabs, EmptyState } from "../components/ui";
@@ -16,10 +20,14 @@ export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
   const d = parseInt(new URL(request.url).searchParams.get("days"), 10);
   const days = [7, 30, 90].includes(d) ? d : 30;
-  const [widgets, messages, prepaid, risk] = await Promise.all([
+  const settings = await getSettings(session.shop);
+  const pro = hasFeature(planOf(settings), "rtoInsights");
+  const [widgets, messages, prepaid, risk, returns] = await Promise.all([
     widgetAnalytics(session.shop, days), messageAnalytics(session.shop, days), prepaidStats(session.shop, days), riskTeaser(session.shop, days),
+    // Breakdowns only leave the server on Pro.
+    returnsAnalytics(session.shop, settings, days, { withBreakdowns: pro }),
   ]);
-  return { ...widgets, messages: { ...messages, prepaid, risk } };
+  return { ...widgets, messages: { ...messages, prepaid, risk }, returns, pro };
 };
 
 function MessagesView({ m }) {
@@ -110,6 +118,118 @@ function MessagesView({ m }) {
   );
 }
 
+const SEGMENTS = {
+  first: N_("First order"), repeat: N_("Repeat customer"), unknown: N_("Unknown"),
+  coupon: N_("Used a coupon"), none: N_("No coupon"),
+  confirmed: N_("Confirmed before shipping"), unconfirmed: N_("Shipped without confirmation"),
+  ...Object.fromEntries(HOUR_BANDS.map((b) => [b.id, b.label])),
+};
+
+function BreakdownTable({ rows, label, first }) {
+  const tr = useT();
+  const pct = (r) => (r == null ? "–" : tr.pct(r));
+  return (
+    <table className="wa-table">
+      <thead>
+        <tr>
+          <th>{first}</th>
+          <th className="wa-right">{tr("COD orders")}</th>
+          <th className="wa-right">{tr("Cancelled")}</th>
+          <th className="wa-right">{tr("No reply")}</th>
+          <th className="wa-right">{tr("Returned (RTO)")}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => (
+          <tr key={r.key}>
+            <td>{label(r)}</td>
+            <td className="wa-right">{tr.n(r.orders)}</td>
+            <td className="wa-right">{pct(r.cancelRate)}</td>
+            <td className="wa-right">{pct(r.noReplyRate)}</td>
+            <td className="wa-right">
+              {r.rtoRate == null ? "–" : <><span className="wa-meter" aria-hidden="true"><span style={{ width: `${Math.min(100, r.rtoRate * 100)}%` }} /></span>{pct(r.rtoRate)}</>}
+              {r.shipped ? <span className="wa-muted wa-small"> · {tr("{count} shipped", { count: tr.n(r.shipped) })}</span> : null}
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function ReturnsView({ r, pro }) {
+  const tr = useT();
+  const seg = (row) => tr(SEGMENTS[row.key] || row.key);
+  const b = r.breakdowns;
+  const download = () => {
+    const sections = [
+      { title: tr("Confirmed vs not confirmed"), rows: b.confirmation.map((x) => ({ ...x, label: seg(x) })) },
+      { title: tr("PIN code"), rows: b.pincodes },
+      { title: tr("First order vs repeat"), rows: b.firstTime.map((x) => ({ ...x, label: seg(x) })) },
+      { title: tr("Coupon"), rows: b.coupon.map((x) => ({ ...x, label: seg(x) })) },
+      { title: tr("Order time"), rows: b.hours.map((x) => ({ ...x, label: seg(x) })) },
+    ];
+    const blob = new Blob([breakdownCsv(sections)], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `pingzest-returns-${r.days}d.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+  return (
+    <>
+      <div className="wa-grid wa-grid--4">
+        <Stat
+          label={tr("Saved on returns")}
+          value={r.saved == null ? "–" : tr.money(r.saved, r.currency)}
+          hint={r.cost == null ? tr("Set your average return cost in Settings → Orders") : tr("{count} parcels × {cost}", { count: tr.n(r.avoided), cost: tr.money(r.cost, r.currency) })}
+        />
+        <Stat label={tr("Parcels you didn't ship")} value={tr.n(r.avoided)} hint={tr("{cancelled} cancelled or unanswered · {prepaid} paid online", { cancelled: tr.n(r.cancelled), prepaid: tr.n(r.prepaid) })} />
+        <Stat label={tr("COD orders")} value={tr.n(r.total)} hint={tr("last {days} days", { days: r.days })} />
+        <Stat label={tr("Returned (RTO)")} value={r.rto.rate == null ? "–" : tr.pct(r.rto.rate)} hint={tr("{returned} of {shipped} shipped COD orders", { returned: tr.n(r.rto.returned), shipped: tr.n(r.rto.shipped) })} />
+      </div>
+      <p className="wa-muted wa-small">
+        {tr("Saved on returns = COD orders cancelled or left unanswered that you didn't ship, plus orders paid online, × your average cost of a returned parcel.")}{" "}
+        <Link to="/app/settings?tab=orders">{r.costIsDefault ? tr("Set your own cost") : tr("Change the cost")}</Link>{" · "}
+        {tr("Mark returned parcels in COD confirmation (Returned (RTO)) to see where returns come from.")}
+      </p>
+
+      {!pro ? (
+        <Card title={tr("Where returns come from")}>
+          <EmptyState icon="🔒" title={tr("Returns insights are on Pro")} action={<Link className="wa-button wa-button--primary" to="/app/plan">{tr("See Pro")}</Link>}>
+            {tr("See cancel, no-reply and return rates by PIN code, first-time vs repeat buyers, coupon use and order time, and whether confirmed orders come back less often. Export to CSV.")}
+          </EmptyState>
+        </Card>
+      ) : r.total === 0 ? (
+        <Card><EmptyState title={tr("No COD orders in this period")}>{tr("Breakdowns appear as COD orders come in.")}</EmptyState></Card>
+      ) : (
+        <>
+          <div className="wa-row-between">
+            <h2 className="wa-h3">{tr("Where returns come from")}</h2>
+            <button type="button" className="wa-button wa-button--secondary" onClick={download}>{tr("Export CSV")}</button>
+          </div>
+          <Card title={tr("Confirmed vs not confirmed")}>
+            <BreakdownTable rows={b.confirmation} label={seg} first={tr("Shipped orders")} />
+            <p className="wa-muted wa-small">{tr("If confirmed orders come back much less often, confirming every COD order before shipping pays off.")}</p>
+          </Card>
+          <Card title={tr("By PIN code")}>
+            {b.pincodes.length === 0
+              ? <p className="wa-muted">{tr("No PIN code has {count} or more COD orders yet.", { count: MIN_PIN_ORDERS })}</p>
+              : <BreakdownTable rows={b.pincodes} label={(x) => <span className="wa-code">{x.key}</span>} first={tr("PIN code")} />}
+            <p className="wa-muted wa-small">{tr("Worst first, from {count} orders. Small numbers can mislead: ask for prepaid or call before blocking a PIN code.", { count: MIN_PIN_ORDERS })}</p>
+          </Card>
+          <div className="wa-grid wa-grid--2">
+            <Card title={tr("First order vs repeat")}><BreakdownTable rows={b.firstTime} label={seg} first={tr("Customer")} /></Card>
+            <Card title={tr("Coupon")}><BreakdownTable rows={b.coupon} label={seg} first={tr("Coupon")} /></Card>
+          </div>
+          <Card title={tr("Order time")}><BreakdownTable rows={b.hours} label={seg} first={tr("Placed")} /></Card>
+        </>
+      )}
+    </>
+  );
+}
+
 const WIDGET_NAMES = {
   chat: N_("Chat button"),
   discount: N_("Discount banner"),
@@ -125,7 +245,7 @@ export default function Analytics() {
   const money = tr.money;
   const a = useLoaderData();
   const [params] = useSearchParams();
-  const view = params.get("view") === "widgets" ? "widgets" : "messages";
+  const view = ["widgets", "returns"].includes(params.get("view")) ? params.get("view") : "messages";
   const t = a.totals;
   const interactions = (w) => (w ? w.click + w.copy + w.apply : 0);
   const totalViews = Object.values(t).reduce((s, w) => s + w.view, 0);
@@ -138,16 +258,16 @@ export default function Analytics() {
   return (
     <Page
       title={tr("Analytics")}
-      subtitle={tr("Messages you send and how shoppers use your widgets. Widget numbers are daily totals only: no cookies or personal data.")}
+      subtitle={tr("Messages you send, what COD confirmation saved you, and how shoppers use your widgets. Widget numbers are daily totals only: no cookies or personal data.")}
       tabs={
         <div className="wa-row-between wa-tabs-row">
-          <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "messages", label: tr("Messages") }, { id: "widgets", label: tr("Widgets") }]} />
+          <Tabs param="view" label={tr("Analytics")} tabs={[{ id: "messages", label: tr("Messages") }, { id: "returns", label: tr("Returns") }, { id: "widgets", label: tr("Widgets") }]} />
           <Tabs param="days" variant="segmented" label={tr("Date range")} tabs={[{ id: "30", label: tr("{days} days", { days: 30 }) }, { id: "7", label: tr("{days} days", { days: 7 }) }, { id: "90", label: tr("{days} days", { days: 90 }) }]} />
         </div>
       }
     >
 
-      {view === "messages" ? <MessagesView m={a.messages} /> : empty ? (
+      {view === "messages" ? <MessagesView m={a.messages} /> : view === "returns" ? <ReturnsView r={a.returns} pro={a.pro} /> : empty ? (
         <Card>
           <EmptyState title={tr("No widget activity yet")}>
             {tr("Numbers appear here as soon as shoppers see your widgets. Check that the app embed is on and tracking is enabled in")}{" "}

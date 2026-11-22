@@ -3,6 +3,7 @@ import { normalizePhone } from "../lib/phone.js";
 import { LOCALES, N_ } from "../i18n/core.js";
 import { loopTimers } from "../lib/cod-loop.js";
 import { hasFeature, planOf } from "../lib/plans.js";
+import { cleanRtoCost } from "../lib/rto.js";
 
 export async function getSettings(shop) {
   return prisma.shopSettings.upsert({ where: { shop }, update: {}, create: { shop } });
@@ -43,6 +44,7 @@ export async function saveSettings(shop, form) {
       codExpireHours: expireHours,
       noReplyTag: tag(form.noReplyTag, "wa-cod-no-reply"),
       cancelRestock: form.cancelRestock === "on",
+      rtoCost: cleanRtoCost(form.rtoCost),
     });
     // Automation is Pro: those fields are disabled (so not sent) on Free, and ignored if sent anyway.
     if (form.loopPro && hasFeature(planOf(await getSettings(shop)), "codAutomation")) {

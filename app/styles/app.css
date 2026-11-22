@@ -476,3 +476,4 @@ ui-nav-menu { display: none !important; }
 @media (max-width: 760px) { .wa-list__actions { min-width: 0; } }
 /* Narrow panels (Widgets editor): wrap tabs instead of hiding some off to the side */
 .wa-editor-panel .wa-tabs { flex-wrap: wrap; overflow: visible; }
+.wa-value__headline { font-size: 16px; font-weight: 600; margin: 0 0 6px; }

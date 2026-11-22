@@ -4,6 +4,7 @@
  * Pure functions: no Shopify SDK, so they are unit-tested.
  */
 import { normalizePhone } from "./phone.js";
+import { firstOrderOf, placedHourOf } from "./rto.js";
 
 const COD_PATTERN = /cash\s*on\s*delivery|\bcod\b|pay\s*on\s*delivery/i;
 
@@ -82,6 +83,8 @@ export function orderRecordFromWebhook(payload, defaultCountryCode = "91") {
     whatsappOptIn: hasWhatsappOptIn(payload),
     discountCodes: discountCodesOf(payload).join(","),
     discountAmount: String(payload.total_discounts ?? "0"),
+    firstOrder: firstOrderOf(payload), // null = unknown (worked out from the store's own orders)
+    placedHour: placedHourOf(payload.created_at),
   };
 }
 

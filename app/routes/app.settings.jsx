@@ -8,11 +8,13 @@ import { useEffect } from "react";
 import { Page, Card, Banner, TabBar, useTabState } from "../components/ui";
 import { Link } from "react-router";
 import { hasFeature, planOf } from "../lib/plans.js";
+import { DEFAULT_RTO_COST } from "../lib/rto.js";
+import { shopCurrency } from "../models/rto.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const settings = await getSettings(session.shop);
-  return { settings, pro: hasFeature(planOf(settings), "codRisk") };
+  const [settings, currency] = await Promise.all([getSettings(session.shop), shopCurrency(session.shop)]);
+  return { settings, pro: hasFeature(planOf(settings), "codRisk"), currency };
 };
 
 export const action = async ({ request }) => {
@@ -51,7 +53,7 @@ function Account() {
 
 export default function Settings() {
   const tr = useT();
-  const { settings, pro } = useLoaderData();
+  const { settings, pro, currency } = useLoaderData();
   const result = useActionData();
   const nav = useNavigation();
   const errors = result?.errors || {};
@@ -130,6 +132,15 @@ export default function Settings() {
             <Field label={tr("Expire after (hours)")} name="codExpireHours" type="number" min={2} max={720} defaultValue={s.codExpireHours} help={tr("After this, an unanswered order counts as No reply.")} />
           </div>
           <label className="wa-check"><input type="checkbox" name="cancelRestock" defaultChecked={s.cancelRestock} /> {tr("Put items back in stock when PingZest cancels an order in Shopify")}</label>
+          <Field
+            label={tr("Average cost of one returned COD parcel ({currency})", { currency })}
+            name="rtoCost" type="number" min={0} step="1"
+            defaultValue={s.rtoCost ?? ""}
+            placeholder={DEFAULT_RTO_COST[currency] != null ? String(DEFAULT_RTO_COST[currency]) : ""}
+            help={DEFAULT_RTO_COST[currency] != null
+              ? tr("Shipping both ways, packing and the ad spend you lose. Used for “Saved on returns”. Empty = {amount}.", { amount: tr.money(DEFAULT_RTO_COST[currency], currency) })
+              : tr("Shipping both ways, packing and the ad spend you lose. Used for “Saved on returns”.")}
+          />
 
           <h3 className="wa-h3">{tr("Autopilot")} {!pro && <span className="wa-tab__badge">Pro</span>}</h3>
           {!pro && <p className="wa-muted wa-small">{tr("On Free you expire and cancel orders with one click in COD confirmation.")} <Link to="/app/plan">{tr("See Pro")}</Link></p>}

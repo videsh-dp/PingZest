@@ -29,7 +29,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Covered by the e2e test, and the fake Shopify validates against the real schema.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** new scope `write_merchant_managed_fulfillment_orders`. Stores that only fulfil from third-party fulfillment-service locations aren't covered: that would need `write_third_party_fulfillment_orders` too, so it's left out until asked for.
-- **Status:** To do.
+- **Status:** Done (f1a237a).
 
 ### PZ-02 · Reminder and expiry for unconfirmed COD orders
 - **Problem:** customers who don't reply are left in "Waiting" forever. Competitors nudge at 24h and expire at 72h (R1 §5 #5; R2 Move 1).
@@ -42,7 +42,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - The due/expiry rules are pure functions with unit tests.
 - **Plan:** Free (tab, manual buttons, settings) / Pro (automatic expiry). **Effort:** S–M.
 - **Dependencies:** none. Reminders are manual until automated sending exists (PZ-20).
-- **Status:** To do.
+- **Status:** Done (f1a237a).
 
 ### PZ-03 · Cancel and restock in Shopify
 - **Problem:** cancelled and expired COD orders must be cancelled by hand in Shopify. The app's footnote says "PingZest doesn't cancel orders for you" (R2 Move 1; R1 §4 item 3).
@@ -53,7 +53,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Errors are recorded and shown as an alert.
 - **Plan:** Free (manual) / Pro (automatic). **Effort:** S.
 - **Dependencies:** `write_orders` (already granted).
-- **Status:** To do.
+- **Status:** Done (f1a237a).
 
 ### PZ-04 · "₹ RTO saved" headline
 - **Problem:** merchants pay when they can tie the app to rupees saved. Only OrderPing shows a savings number (R1 §3 "Signals"; R2 Move 2; R2 §5.1 row 14).
@@ -64,7 +64,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Pure calculation with unit tests.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** none.
-- **Status:** To do.
+- **Status:** Done (commit "Returns: saved on returns…").
 
 ### PZ-05 · RTO breakdowns (Pro)
 - **Problem:** a single RTO % hides the patterns. Merchants want cuts by pincode, first-time buyer, coupon and order hour, and confirmed vs unconfirmed RTO (R1 §1 job 2; R2 Move 2).
@@ -80,10 +80,10 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
     - Pro only: tables by pincode (top 10, min. 3 orders), first-time vs repeat, coupon vs none and hour band, each with COD orders, cancel %, no-reply % and RTO %
     - Pro only: RTO split by confirmed vs unconfirmed orders
     - Pro only: CSV export
-  - Free sees the tables blurred with an upgrade link. No row data is sent to the page on Free.
+  - Free sees a locked card with an upgrade link. No breakdown data is sent to the page on Free.
 - **Plan:** Free headline / Pro breakdowns. **Effort:** M.
 - **Dependencies:** PZ-04. True delivery outcome comes from the manual mark. Courier integration is PZ-25.
-- **Status:** To do.
+- **Status:** Done (commit "Returns: saved on returns…").
 
 ### PZ-06 · Value framing on the Plan page
 - **Problem:** "Pays for itself after 2 saved RTOs" is the pitch. The feature list doesn't say it (R2 §5.4; R1 §3).
@@ -94,7 +94,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Prices and plan structure are unchanged.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-04.
-- **Status:** To do.
+- **Status:** Done (commit "Returns: saved on returns…").
 
 ### PZ-07 · Alerts for stuck work
 - **Problem:** silent failures are churn cause #2: "automations stop and nobody notices" (R1 §2 item 2; R2 Move 7; R2 §3 weak spot 1).

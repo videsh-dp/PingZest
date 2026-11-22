@@ -3,6 +3,7 @@ import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { dashboardStats } from "../models/orders.server";
 import { fetchShopName } from "../models/shopify-admin.server";
+import { savedSummary } from "../models/rto.server";
 import prisma from "../db.server";
 import { Page, Card, Stat, Banner } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
@@ -29,15 +30,15 @@ export const loader = async ({ request }) => {
     optin: `${editor}?template=cart&addAppBlockId=${apiKey}/optin&target=mainSection`,
   };
 
-  const stats = await dashboardStats(shop);
+  const [stats, saved] = await Promise.all([dashboardStats(shop), savedSummary(shop, settings, 30)]);
   const templatesSaved = await prisma.messageTemplate.count({ where: { shop } });
   const widgetsSaved = Boolean(await prisma.widgetConfig.findUnique({ where: { shop }, select: { syncedAt: true } }).then((w) => w?.syncedAt));
-  return { settings, stats, deepLinks, templatesSaved, widgetsSaved };
+  return { settings, stats, saved, deepLinks, templatesSaved, widgetsSaved };
 };
 
 export default function Index() {
   const tr = useT();
-  const { settings, stats, deepLinks, templatesSaved, widgetsSaved } = useLoaderData();
+  const { settings, stats, saved, deepLinks, templatesSaved, widgetsSaved } = useLoaderData();
   const app = useRouteLoaderData("routes/app") || {};
   const clicks = stats.clicksByType;
   const totalClicks = Object.values(clicks).reduce((a, b) => a + b, 0);
@@ -70,12 +71,18 @@ export default function Index() {
 
       <div className="wa-grid wa-grid--2">
         <Card title={tr("COD results, last 30 days")}>
-          <div className="wa-grid wa-grid--3 wa-grid--tight">
+          <div className="wa-grid wa-grid--4 wa-grid--tight">
+            <Stat label={tr("Saved on returns")} value={saved.saved == null ? tr.n(saved.avoided) : tr.money(saved.saved, saved.currency)} hint={tr("{count} parcels you didn't ship", { count: tr.n(saved.avoided) })} to="/app/analytics?view=returns" />
             <Stat label={tr("Confirmed")} value={stats.confirmed} />
             <Stat label={tr("Cancelled")} value={stats.cancelled} hint={tr("returns avoided")} />
             <Stat label={tr("Response rate")} value={stats.codWaiting + responded ? tr.pct(responded / (stats.codWaiting + responded)) : "–"} />
           </div>
-          <p className="wa-muted">{tr("Each cancelled COD order is a parcel you didn't ship and pay to get back.")}</p>
+          <p className="wa-muted">
+            {saved.cost == null
+              ? tr("Each cancelled COD order is a parcel you didn't ship and pay to get back.")
+              : tr("Each COD order you didn't ship after a cancel or no reply saves about {cost} in return costs.", { cost: tr.money(saved.cost, saved.currency) })}{" "}
+            <Link to="/app/settings?tab=orders">{tr("Change the cost")}</Link>
+          </p>
         </Card>
         <Card title={tr("Widget clicks, last 30 days")}>
           <div className="wa-grid wa-grid--4 wa-grid--tight">

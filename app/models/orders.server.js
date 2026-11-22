@@ -17,6 +17,12 @@ export async function upsertOrderFromWebhook(shop, payload, countryCode) {
   const existing = await prisma.order.findUnique({
     where: { shop_shopifyOrderId: { shop, shopifyOrderId: rec.shopifyOrderId } },
   });
+  // First-time buyer (returns analytics): Shopify's orders_count when sent, else this store's orders by phone.
+  if (rec.firstOrder === null) {
+    delete rec.firstOrder;
+    if (!existing && rec.phone) rec.firstOrder = (await prisma.order.count({ where: { shop, phone: rec.phone } })) === 0;
+  }
+  if (rec.placedHour === null) delete rec.placedHour;
   const tokenFields =
     rec.isCod && !existing?.confirmToken ? { confirmToken: generateToken(), tokenExpiresAt: tokenExpiry() } : {};
 

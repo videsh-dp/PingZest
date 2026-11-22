@@ -31,6 +31,7 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | Admin | Abandoned checkout queue and order updates queue (shipped / delivered) | Level 2 customer data |
 | **Templates** | A built-in Standard template for every stage and language, plus **5 custom templates on the Free plan** (unlimited on Pro), one default per stage and language; formatting toolbar for what typed WhatsApp messages support (bold, italic, strikethrough, monospace, inline code, quote, lists), emoji, variables; phone-style preview rendered like WhatsApp; starter templates | – |
 | Queues | Template picker on each queue: switch templates and the messages update instantly | – |
+| **Saved on returns** | Home, Plan and Analytics → Returns show the money COD confirmation saved: COD orders cancelled or unanswered and not shipped, plus orders paid online, × the merchant's average cost of a returned parcel (Settings → Orders; ₹500 by default for INR stores). "Returned (RTO)" mark on COD orders | – |
 | **Message analytics** | Messages sent per day and by stage, COD confirm/cancel rate, median reply time, checkout recovery rate and sales, **template performance** | – |
 | Public | `/c/:token` confirm page: customer taps Confirm/Cancel → order tagged in Shopify | – |
 | **Languages** | Admin in **7 languages** (English, हिन्दी, Español, Português (Brasil), Français, Deutsch, العربية with right-to-left layout). Follows the Shopify admin language, or pick one in Settings. Numbers, money, dates and plurals use the built-in `Intl` library | – |
@@ -185,6 +186,8 @@ Prices and features are in `app/lib/plans.js`; Shopify bills the merchant on the
 | **COD → prepaid** (confirm page: "pay online now and save X%") | – | ✓ |
 | **Address check** (confirm page: customer fixes the address or adds a landmark) | – | ✓ |
 | **COD follow-up**: fulfillment hold, reminders, expire, cancel + restock in Shopify | by hand | ✓ + **autopilot** |
+| **Saved on returns** headline (Home, Plan, Analytics) | ✓ | ✓ |
+| **Returns insights**: cancel / no-reply / RTO rates by PIN code, first-time vs repeat buyer, coupon, order hour; confirmed vs unconfirmed RTO; CSV export | – | ✓ |
 | "Powered by PingZest" in the chat popup | shown | hidden |
 
 - **Plan page** (`/app/plan`): compare, start the trial (Shopify's approval page), cancel.

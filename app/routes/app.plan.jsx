@@ -4,6 +4,8 @@ import { authenticate } from "../shopify.server";
 import { syncPlan, requestPlan, cancelPlan, isTestBilling } from "../models/billing.server";
 import { customTemplateAllowance } from "../models/templates.server";
 import { riskTeaser } from "../models/risk.server";
+import { savedSummary } from "../models/rto.server";
+import { paybackReturns } from "../lib/rto.js";
 import { Page, Card, Banner } from "../components/ui";
 import { useT } from "../i18n/react.jsx";
 import { BILLING_PLANS, FEATURE_LIST, PRO_MONTHLY, PRO_YEARLY, TRIAL_DAYS, planOf } from "../lib/plans.js";
@@ -13,7 +15,7 @@ export const loader = async ({ request }) => {
   const shop = session.shop;
   const upgraded = new URL(request.url).searchParams.get("upgraded") === "1";
   const settings = await syncPlan(shop, billing, admin, { force: upgraded });
-  const [allowance, risky] = await Promise.all([customTemplateAllowance(shop), riskTeaser(shop)]);
+  const [allowance, risky, saved] = await Promise.all([customTemplateAllowance(shop), riskTeaser(shop), savedSummary(shop, settings, 30)]);
   return {
     plan: planOf(settings),
     subscriptionName: settings.subscriptionName,
@@ -23,6 +25,8 @@ export const loader = async ({ request }) => {
     prices: BILLING_PLANS,
     allowance,
     risky,
+    saved,
+    payback: paybackReturns(saved.cost, saved.currency, BILLING_PLANS[PRO_MONTHLY].amount),
   };
 };
 
@@ -61,6 +65,27 @@ export default function PlanPage() {
           {tr("Pro shows which ones and why, so you can call or ask for prepaid before shipping.")}
         </Banner>
       )}
+
+      <Card className="wa-value">
+        {d.saved.saved != null && d.saved.avoided > 0 ? (
+          <p className="wa-value__headline">
+            {tr("In the last 30 days, COD confirmation saved you about {amount}: {count} parcels you didn't ship and pay to get back.", { amount: tr.money(d.saved.saved, d.saved.currency), count: tr.n(d.saved.avoided) })}
+          </p>
+        ) : (
+          <p className="wa-value__headline">{tr("One COD parcel that comes back costs you shipping both ways, packing and the ad spend. Pro is built to stop a few of those every month.")}</p>
+        )}
+        {d.payback && (
+          <p className="wa-muted">
+            {tr.plural(
+              "At about {cost} per returned parcel, Pro (about {price} a month) pays for itself when it prevents {count} return a month.",
+              "At about {cost} per returned parcel, Pro (about {price} a month) pays for itself when it prevents {count} returns a month.",
+              d.payback.count,
+              { cost: tr.money(d.saved.cost, d.saved.currency), price: tr.money(d.payback.price, d.saved.currency) },
+            )}
+          </p>
+        )}
+        <p className="wa-muted wa-small">{tr("Zero markup: PingZest never charges per message. You pay one flat price, billed by Shopify, and cancel any time.")}</p>
+      </Card>
 
       <div className="wa-plans">
         <Card title={tr("Free")} className={!isPro ? "wa-plan is-current" : "wa-plan"}>
