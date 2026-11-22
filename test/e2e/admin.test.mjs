@@ -820,7 +820,7 @@ test("COD autopilot (Pro): expires unanswered orders on app load and by cron, ca
   let n = shopify.calls.length;
   assertPage(await page("/app"), "home runs the autopilot");
   // It runs after the page is sent (so it never slows the page down): wait for it.
-  for (let i = 0; i < 40 && (await orderRow(o)).codStatus !== "no_reply"; i++) await new Promise((r) => setTimeout(r, 250));
+  for (let i = 0; i < 40 && !(await orderRow(o)).shopifyCancelledAt; i++) await new Promise((r) => setTimeout(r, 250));
   const expired = await orderRow(o);
   assert.equal(expired.codStatus, "no_reply", "expired automatically");
   assert.ok(expired.codExpiredAt);
