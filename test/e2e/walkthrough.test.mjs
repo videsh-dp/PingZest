@@ -79,7 +79,9 @@ async function shot(page, flow, slug, title, caption, { phone = false } = {}) {
 }
 
 async function webhookOrder(o, state = {}) {
-  app.shopify.state.orders.set(o.admin_graphql_api_id, state);
+  const a = o.shipping_address || {};
+  const shippingAddress = { firstName: a.first_name, lastName: a.last_name || "", company: null, address1: a.address1 || "", address2: a.address2 || "", city: a.city || "", provinceCode: "MH", province: "Maharashtra", zip: a.zip || "", countryCodeV2: "IN", country: "India", phone: a.phone || null };
+  app.shopify.state.orders.set(o.admin_graphql_api_id, { shippingAddress, ...state });
   assert.equal((await app.webhook("/webhooks/orders", "orders/create", o)).status, 200);
   return prisma.order.findFirst({ where: { shop: SHOP, shopifyOrderId: String(o.id) } });
 }
