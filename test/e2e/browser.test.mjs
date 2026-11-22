@@ -208,6 +208,7 @@ test("Home: setup guide ticks the theme step from App Bridge, can be dismissed a
   await page.locator('[data-step="hold"] .wa-guide__title').click();
   await page.getByRole("button", { name: "Turn on hold" }).click();
   await page.locator('[data-step="hold"][data-done="1"]').waitFor();
+  for (let i = 0; i < 20 && !(await prisma.shopSettings.findUnique({ where: { shop: SHOP } })).codHold; i++) await page.waitForTimeout(250);
   assert.equal((await prisma.shopSettings.findUnique({ where: { shop: SHOP } })).codHold, true);
 
   // Today → COD queue.
