@@ -47,6 +47,8 @@ async function newPage({ mobile = false } = {}) {
     // the app (Polaris hides them inside the iframe). The stand-in draws the same bar at the top of the page;
     // its buttons click the app's own elements, like App Bridge does.
     const drawTitleBar = () => {
+      // Only after React has hydrated: adding nodes earlier would make hydration fail.
+      if (document.documentElement.dataset.hydrated !== "1") return;
       const pageEl = document.querySelector("s-page");
       let bar = document.getElementById("ab-titlebar");
       if (!pageEl) { bar?.remove(); return; }
@@ -83,7 +85,7 @@ async function newPage({ mobile = false } = {}) {
       for (const el of items.filter((i) => i.slot === "secondary-actions")) bar.append(proxy(el, "border:1px solid #c9c9c9;background:#fff;border-radius:8px;padding:5px 10px;font:inherit;font-size:13px;cursor:pointer"));
       for (const el of items.filter((i) => i.slot === "primary-action")) bar.append(proxy(el, "border:0;background:#303030;color:#fff;border-radius:8px;padding:6px 12px;font:inherit;font-size:13px;cursor:pointer"));
     };
-    new MutationObserver(() => drawTitleBar()).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["heading", "href"] });
+    new MutationObserver(() => drawTitleBar()).observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ["heading", "href", "data-hydrated"] });
     const original = window.fetch.bind(window);
     window.fetch = async (input, init = {}) => {
       const url = new URL(typeof input === "string" ? input : input.url, location.href);
@@ -164,6 +166,7 @@ const PAGES = [
 
 const shotName = (path) => path.replace(/\//g, "_").replace(/^_/, "") || "app";
 async function shoot(page, name) {
+  if (await page.locator("s-page").count()) await page.locator("#ab-titlebar").waitFor({ timeout: 5000 }).catch(() => {});
   await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
   await page.screenshot({ path: `${SHOTS}/${name}.jpg`, type: "jpeg", quality: 45, fullPage: true }); // small copy for review
 }

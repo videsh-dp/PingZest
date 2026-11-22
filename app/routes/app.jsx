@@ -51,6 +51,8 @@ export default function App() {
   useEffect(() => {
     if (typeof window !== "undefined" && window.posthog?.identify) window.posthog.identify(shop, { shop, plan });
   }, [shop, plan]);
+  // Marks the page as interactive (used by the browser tests' App Bridge stand-in).
+  useEffect(() => { document.documentElement.dataset.hydrated = "1"; }, []);
   // Page speed as Shopify measures it for Built for Shopify (LCP, CLS, INP): numbers only.
   useEffect(() => {
     const vitals = typeof window !== "undefined" ? window.shopify?.webVitals : null;
