@@ -22,15 +22,17 @@ export const PLANS = {
   pro: {
     name: "Pro",
     customTemplates: null, // null = unlimited
-    features: ["unlimitedTemplates", "noBranding", "codRisk", "prepaidOffer", "addressCheck"],
+    features: ["unlimitedTemplates", "noBranding", "codRisk", "prepaidOffer", "addressCheck", "codAutomation", "rtoInsights"],
   },
 };
 
 /** What the Plan page lists, in order. */
 export const FEATURE_LIST = [
   { key: "basics", free: true, label: N_("Chat button, discount banner, page buttons, COD queue, cart and order messages, analytics, 7 languages") },
+  { key: "codLoop", free: true, label: N_("Close the COD loop: hold fulfillment until confirmed, reminders, expire, cancel and restock in Shopify with one click") },
   { key: "templates", free: N_("5 custom"), pro: N_("Unlimited"), label: N_("Message templates") },
   { key: "codRisk", label: N_("COD risk score: spot risky orders before you ship") },
+  { key: "codAutomation", label: N_("COD autopilot: expire unanswered orders and cancel + restock them in Shopify automatically") },
   { key: "prepaidOffer", label: N_("COD → prepaid: customers can pay online for a small discount") },
   { key: "addressCheck", label: N_("Address check: customers fix their address or add a landmark") },
   { key: "noBranding", label: N_("No “Powered by PingZest” on your chat widget") },

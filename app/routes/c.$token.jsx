@@ -9,7 +9,8 @@ import { Form, useActionData, useLoaderData, useNavigation, useRouteError, data,
 import { unauthenticated } from "../shopify.server";
 import { findByToken, setCodStatus } from "../models/orders.server";
 import { getSettings } from "../models/settings.server";
-import { tagOrder, removeOrderTags, fetchOrderForConfirm, updateShippingAddress, applyPrepaidDiscount } from "../models/shopify-admin.server";
+import { fetchOrderForConfirm, updateShippingAddress, applyPrepaidDiscount } from "../models/shopify-admin.server";
+import { applyCodOutcome } from "../models/cod-loop.server";
 import { hasFeature, planOf } from "../lib/plans.js";
 import { prepaidDiscount, canOfferPrepaid, cleanAddressForm } from "../lib/prepaid.js";
 import prisma from "../db.server";
@@ -47,7 +48,7 @@ async function liveOrder(order, settings) {
   const plan = planOf(settings);
   const wantPrepaid = hasFeature(plan, "prepaidOffer") && settings.prepaidEnabled;
   const wantAddress = hasFeature(plan, "addressCheck") && settings.addressCheck;
-  if ((!wantPrepaid && !wantAddress) || order.expired || order.shippedAt) return { wantPrepaid: false, wantAddress: false, live: null };
+  if ((!wantPrepaid && !wantAddress) || order.expired || order.shippedAt || order.shopifyCancelledAt) return { wantPrepaid: false, wantAddress: false, live: null };
   try {
     const { admin } = await unauthenticated.admin(order.shop);
     return { wantPrepaid, wantAddress, live: await fetchOrderForConfirm(admin, order.orderGid), admin };
@@ -90,6 +91,7 @@ function view(order, settings, lang) {
     status: order.codStatus,
     expired: Boolean(order.expired),
     locked: Boolean(order.shippedAt),
+    cancelledInShopify: Boolean(order.shopifyCancelledAt),
     storeChat: settings.whatsappNumber ? waLink(settings.whatsappNumber, textsFor(lang)("chat", { order: order.orderName })) : null,
     ogImage: `${appUrl()}/og-confirm.png`,
   };
@@ -105,7 +107,7 @@ export const loader = async ({ params, request }) => {
 
 export const action = async ({ params, request }) => {
   const found = await load(params.token);
-  if (!found || found.order.expired || found.order.shippedAt) return data({ error: true }, { status: 400 });
+  if (!found || found.order.expired || found.order.shippedAt || found.order.shopifyCancelledAt) return data({ error: true }, { status: 400 });
   const form = await request.formData();
   const intent = form.get("intent");
   if (intent === "prepay") return prepay(found);
@@ -114,17 +116,16 @@ export const action = async ({ params, request }) => {
   if (!["confirmed", "cancelled"].includes(choice)) return data({ error: true }, { status: 400 });
 
   const { order, settings } = found;
-  await setCodStatus(order.shop, order.id, choice, "customer");
+  const updated = await setCodStatus(order.shop, order.id, choice, "customer");
+  // Tags, releasing the fulfillment hold, and (Pro, opt-in) cancel + restock. The choice is saved either
+  // way; a failed Shopify call is shown to the merchant as an alert.
+  let admin = null;
   try {
-    const { admin } = await unauthenticated.admin(order.shop);
-    const add = choice === "confirmed" ? settings.confirmedTag : settings.cancelledTag;
-    const remove = choice === "confirmed" ? settings.cancelledTag : settings.confirmedTag;
-    await tagOrder(admin, order.orderGid, [add]);
-    await removeOrderTags(admin, order.orderGid, [remove]);
+    ({ admin } = await unauthenticated.admin(order.shop));
   } catch (e) {
-    // The choice is saved either way; the merchant sees it in the app.
-    console.error("Tagging failed", e?.message);
+    console.error("No Shopify session for the confirm page", e?.message);
   }
+  await applyCodOutcome(updated, { status: choice, by: "customer" }, admin, settings);
   return { ok: true };
 };
 
@@ -226,8 +227,9 @@ export default function ConfirmPage() {
         </dl>
 
         {!d.expired && d.locked && <p className="cf__note">{t.locked}</p>}
+        {!d.expired && !d.locked && d.cancelledInShopify && <p className="cf__note">{t.cancelledLocked}</p>}
 
-        {!d.expired && !d.locked && (
+        {!d.expired && !d.locked && !d.cancelledInShopify && (
           <Form method="post" className="cf__actions" onSubmit={(e) => {
             const c = e.nativeEvent.submitter?.value;
             if (c === "cancelled" && !window.confirm(t.confirmCancel)) e.preventDefault();

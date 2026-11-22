@@ -150,6 +150,13 @@ test("sidebar shows work waiting; lists search; tabs keep their place in the URL
   assert.equal(await page.locator(".wa-list__table tbody tr").count(), rowsBefore);
   await page.screenshot({ path: `${SHOTS}/cod-list.png`, fullPage: true });
 
+  // COD follow-up: the To remind tab opens without errors.
+  await page.locator(".wa-tabs").getByRole("link", { name: /^To remind/ }).click();
+  await page.waitForURL((u) => new URL(u).searchParams.get("filter") === "remind");
+  await page.waitForLoadState("networkidle");
+  assert.match(await page.locator("body").innerText(), /All caught up|Send reminder/, "To remind tab shows its list or empty state");
+  await page.screenshot({ path: `${SHOTS}/cod-remind.jpg`, type: "jpeg", quality: 45 });
+
   // Settings tabs: switch to Orders, the URL remembers it, and saving keeps fields from the other tabs.
   await page.goto(app.adminUrl("/app/settings"), { waitUntil: "networkidle" });
   const before = await prisma.shopSettings.findUnique({ where: { shop: SHOP } });

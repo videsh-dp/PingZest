@@ -20,9 +20,11 @@ include_config_on_deploy = true
 # write_orders lets the confirm page tag orders as confirmed / cancelled.
 # read/write_discounts let merchants create discount codes for the discount banner.
 # write_order_edits applies the "pay online and save" discount to a COD order (Pro).
+# write_merchant_managed_fulfillment_orders holds fulfillment of a COD order until the customer confirms
+#   (Settings → Orders → COD follow-up) and releases it on confirm. orderCancel (cancel + restock) uses write_orders.
 # read_fulfillments is needed for the fulfillments/* webhooks (shipped / delivered messages).
 # write_app_proxy is required because the app has an app proxy (/apps/pingzest).
-scopes = "read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_app_proxy"
+scopes = "read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_merchant_managed_fulfillment_orders,write_app_proxy"
 
 [auth]
 redirect_urls = ["https://example.com/auth/callback"]

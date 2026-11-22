@@ -7,6 +7,7 @@ import prisma from "../db.server";
 import { getSettings } from "./settings.server";
 import { tagOrder } from "./shopify-admin.server";
 import { capture } from "../posthog.server";
+import { releaseCodHold } from "./cod-loop.server";
 
 export async function recordPaid(shop, payload, admin) {
   const order = await prisma.order.findUnique({ where: { shop_shopifyOrderId: { shop, shopifyOrderId: String(payload.id) } } });
@@ -25,6 +26,7 @@ export async function recordPaid(shop, payload, admin) {
     const settings = await getSettings(shop);
     if (admin) {
       await tagOrder(admin, order.orderGid, [settings.prepaidTag, settings.confirmedTag].filter(Boolean)).catch((e) => console.error("prepaid tag failed", e?.message));
+      await releaseCodHold(updated, admin); // paying online counts as confirming
     }
     capture("cod_converted_to_prepaid", shop, { amount: Number(payload.total_price) || Number(order.totalPrice), currency: order.currency, discount: Number(order.prepaidDiscount || 0) });
   }

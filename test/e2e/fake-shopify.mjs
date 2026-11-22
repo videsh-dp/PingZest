@@ -49,6 +49,14 @@ export async function startFakeShopify({ port = 443, cert, key, scopes }) {
     return [];
   };
 
+  function findFulfillmentOrder(id) {
+    for (const o of state.orders.values()) {
+      const fo = (o.fulfillmentOrders || []).find((f) => f.id === id);
+      if (fo) return fo;
+    }
+    return null;
+  }
+
   function subscriptionNode(s) {
     return {
       id: s.id, name: s.name, test: s.test ?? true, status: s.status, trialDays: s.trialDays ?? 7,
@@ -144,6 +152,40 @@ export async function startFakeShopify({ port = 443, cert, key, scopes }) {
         const o = state.orders.get(variables?.input?.id);
         if (o) o.shippingAddress = { ...(o.shippingAddress || {}), ...variables.input.shippingAddress, countryCodeV2: variables.input.shippingAddress.countryCode };
         return { orderUpdate: { order: { id: variables?.input?.id }, userErrors: userErrors(op) } };
+      }
+      // ---- closing the COD loop: fulfillment holds and cancel + restock ----
+      case "codFulfillmentOrders": {
+        const o = state.orders.get(variables?.id);
+        if (!o) return { order: null };
+        if (!o.fulfillmentOrders) o.fulfillmentOrders = [{ id: newId("FulfillmentOrder"), status: "OPEN", holds: [] }];
+        return { order: {
+          id: variables.id, cancelledAt: o.cancelledAt || null, displayFulfillmentStatus: "UNFULFILLED",
+          fulfillmentOrders: { nodes: o.fulfillmentOrders.map((fo) => ({ id: fo.id, status: fo.status })) },
+        } };
+      }
+      case "holdFulfillmentOrder": {
+        const errs = userErrors(op);
+        const fo = findFulfillmentOrder(variables?.id);
+        if (errs.length || !fo) return { fulfillmentOrderHold: { fulfillmentHold: null, fulfillmentOrder: null, userErrors: errs.length ? errs : [{ field: ["id"], message: "Fulfillment order not found" }] } };
+        const hold = { id: newId("FulfillmentHold"), reason: variables.fulfillmentHold.reason, notes: variables.fulfillmentHold.reasonNotes };
+        fo.holds.push(hold);
+        fo.status = "ON_HOLD";
+        return { fulfillmentOrderHold: { fulfillmentHold: { id: hold.id }, fulfillmentOrder: { id: fo.id, status: fo.status }, userErrors: [] } };
+      }
+      case "releaseFulfillmentHold": {
+        const errs = userErrors(op);
+        const fo = findFulfillmentOrder(variables?.id);
+        if (errs.length || !fo) return { fulfillmentOrderReleaseHold: { fulfillmentOrder: null, userErrors: errs.length ? errs : [{ field: ["id"], message: "Fulfillment order not found" }] } };
+        fo.holds = variables.holdIds ? fo.holds.filter((h) => !variables.holdIds.includes(h.id)) : [];
+        if (!fo.holds.length) fo.status = "OPEN";
+        return { fulfillmentOrderReleaseHold: { fulfillmentOrder: { id: fo.id, status: fo.status }, userErrors: [] } };
+      }
+      case "cancelOrder": {
+        const errs = userErrors(op);
+        if (errs.length) return { orderCancel: { job: null, orderCancelUserErrors: errs.map((e) => ({ ...e, code: "INVALID" })) } };
+        const o = state.orders.get(variables?.orderId);
+        if (o) Object.assign(o, { cancelledAt: new Date().toISOString(), cancelReason: variables.reason, restocked: variables.restock, cancelNote: variables.staffNote });
+        return { orderCancel: { job: { id: newId("Job"), done: false }, orderCancelUserErrors: [] } };
       }
       case "beginEdit":
         return { orderEditBegin: { calculatedOrder: { id: newId("CalculatedOrder"), lineItems: { nodes: [{ id: newId("CalculatedLineItem"), quantity: 1 }] } }, userErrors: userErrors(op) } };

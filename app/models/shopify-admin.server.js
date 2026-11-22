@@ -323,3 +323,65 @@ export async function applyPrepaidDiscount(admin, orderGid, { percent, maxAmount
   if (commitErrors.length) throw new Error(commitErrors.map((e) => e.message).join("; "));
   return Math.round(subtotal * pct) / 100;
 }
+
+/* ---------- closing the COD loop: fulfillment hold, cancel + restock ---------- */
+
+const messages = (errs) => errs.map((e) => e.message).join("; ");
+
+/** The order's fulfillment orders: [{ id, status }]. Needs read_merchant_managed_fulfillment_orders. */
+export async function fetchFulfillmentOrders(admin, orderGid) {
+  const data = await gql(admin, `#graphql
+    query codFulfillmentOrders($id: ID!) {
+      order(id: $id) {
+        id cancelledAt displayFulfillmentStatus
+        fulfillmentOrders(first: 10) { nodes { id status } }
+      }
+    }`, { id: orderGid });
+  return { order: data.order, nodes: data.order?.fulfillmentOrders?.nodes || [] };
+}
+
+/** Put one fulfillment order on hold until the customer confirms. Returns the hold id. */
+export async function holdFulfillmentOrder(admin, fulfillmentOrderId, note) {
+  const data = await gql(admin, `#graphql
+    mutation holdFulfillmentOrder($id: ID!, $fulfillmentHold: FulfillmentOrderHoldInput!) {
+      fulfillmentOrderHold(id: $id, fulfillmentHold: $fulfillmentHold) {
+        fulfillmentHold { id }
+        fulfillmentOrder { id status }
+        userErrors { field message }
+      }
+    }`, { id: fulfillmentOrderId, fulfillmentHold: { reason: "OTHER", reasonNotes: note, notifyMerchant: false } });
+  const r = data.fulfillmentOrderHold;
+  if (r?.userErrors?.length) throw new Error(messages(r.userErrors));
+  return r?.fulfillmentHold?.id || null;
+}
+
+/** Release PingZest's hold (and only that hold, when its id is known). */
+export async function releaseFulfillmentHold(admin, fulfillmentOrderId, holdId) {
+  const data = await gql(admin, `#graphql
+    mutation releaseFulfillmentHold($id: ID!, $holdIds: [ID!]) {
+      fulfillmentOrderReleaseHold(id: $id, holdIds: $holdIds) {
+        fulfillmentOrder { id status }
+        userErrors { field message }
+      }
+    }`, { id: fulfillmentOrderId, holdIds: holdId ? [holdId] : null });
+  const r = data.fulfillmentOrderReleaseHold;
+  if (r?.userErrors?.length) throw new Error(messages(r.userErrors));
+  return true;
+}
+
+/**
+ * Cancel an unpaid COD order in Shopify, optionally putting the items back in stock. Nothing to refund
+ * (cash on delivery), and the customer isn't emailed. Shopify cancels asynchronously (a job).
+ */
+export async function cancelShopifyOrder(admin, orderGid, { restock = true, reason = "CUSTOMER", note = "" } = {}) {
+  const data = await gql(admin, `#graphql
+    mutation cancelOrder($orderId: ID!, $reason: OrderCancelReason!, $restock: Boolean!, $notifyCustomer: Boolean, $staffNote: String) {
+      orderCancel(orderId: $orderId, reason: $reason, restock: $restock, notifyCustomer: $notifyCustomer, staffNote: $staffNote) {
+        job { id done }
+        orderCancelUserErrors { field message code }
+      }
+    }`, { orderId: orderGid, reason, restock: Boolean(restock), notifyCustomer: false, staffNote: String(note).slice(0, 255) });
+  const r = data.orderCancel;
+  if (r?.orderCancelUserErrors?.length) throw new Error(messages(r.orderCancelUserErrors));
+  return r?.job?.id || true;
+}

@@ -4,6 +4,7 @@ import { upsertOrderFromWebhook } from "../models/orders.server";
 import { fetchOrderAsPayload } from "../models/shopify-admin.server";
 import { pickPhone } from "../lib/orders.js";
 import { assessOrder } from "../models/risk.server";
+import { holdCodOrder, processDueCod } from "../models/cod-loop.server";
 
 // orders/create: store the order; COD orders get a confirm link token.
 export const action = async ({ request }) => {
@@ -26,6 +27,10 @@ export const action = async ({ request }) => {
     await assessOrder(shop, order, data, admin); // COD risk score
   } catch (e) {
     console.error("risk score failed", e?.message);
+  }
+  if (order.isCod && admin) {
+    await holdCodOrder(order, admin, settings); // until the customer confirms (Settings → Orders)
+    await processDueCod(shop, admin, { limit: 10 }).catch((e) => console.error("COD autopilot failed", e?.message));
   }
   return new Response();
 };

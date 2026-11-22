@@ -41,7 +41,7 @@ test("message stats: per stage, COD outcomes, cart recovery, template performanc
   const s = computeMessageStats({ logs, orders, checkouts, templates: [{ id: 2, name: "Short & friendly" }], days: 7, now });
 
   assert.equal(s.totalSent, 5);
-  assert.deepEqual(s.byKind, { cod_confirm: 3, abandoned_cart: 1, shipped: 1, delivered: 0 });
+  assert.deepEqual(s.byKind, { cod_confirm: 3, cod_reminder: 0, abandoned_cart: 1, shipped: 1, delivered: 0 });
   assert.equal(s.daily.at(-1).total, 3);
   assert.equal(s.daily.length, 7);
 

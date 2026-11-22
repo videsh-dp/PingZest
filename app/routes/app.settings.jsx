@@ -118,6 +118,28 @@ export default function Settings() {
         <Card title={tr("COD confirmation")}>
           <Field label={tr("Tag for confirmed orders")} name="confirmedTag" defaultValue={s.confirmedTag} help={tr("Added to the Shopify order when the customer confirms.")} />
           <Field label={tr("Tag for cancelled orders")} name="cancelledTag" defaultValue={s.cancelledTag} help={tr("Filter these in Shopify Orders and cancel them before shipping.")} />
+          <Field label={tr("Tag for orders with no reply")} name="noReplyTag" defaultValue={s.noReplyTag} help={tr("Added when an order expires or you mark it No reply.")} />
+        </Card>
+
+        <Card title={tr("COD follow-up")}>
+          <input type="hidden" name="loopSettings" value="1" />
+          <label className="wa-check"><input type="checkbox" name="codHold" defaultChecked={s.codHold} /> {tr("Hold fulfillment of new COD orders until the customer confirms")}</label>
+          <p className="wa-muted wa-small">{tr("Shopify shows the order as On hold, so nobody packs it by mistake. PingZest releases the hold when the order is confirmed.")}</p>
+          <div className="wa-grid wa-grid--2">
+            <Field label={tr("Remind after (hours)")} name="codRemindHours" type="number" min={1} max={168} defaultValue={s.codRemindHours} help={tr("Orders without a reply move to COD confirmation → To remind.")} />
+            <Field label={tr("Expire after (hours)")} name="codExpireHours" type="number" min={2} max={720} defaultValue={s.codExpireHours} help={tr("After this, an unanswered order counts as No reply.")} />
+          </div>
+          <label className="wa-check"><input type="checkbox" name="cancelRestock" defaultChecked={s.cancelRestock} /> {tr("Put items back in stock when PingZest cancels an order in Shopify")}</label>
+
+          <h3 className="wa-h3">{tr("Autopilot")} {!pro && <span className="wa-tab__badge">Pro</span>}</h3>
+          {!pro && <p className="wa-muted wa-small">{tr("On Free you expire and cancel orders with one click in COD confirmation.")} <Link to="/app/plan">{tr("See Pro")}</Link></p>}
+          <fieldset disabled={!pro} className="wa-fieldset">
+            {pro && <input type="hidden" name="loopPro" value="1" />}
+            <label className="wa-check"><input type="checkbox" name="codAutoExpire" defaultChecked={s.codAutoExpire} /> {tr("Expire unanswered orders automatically")}</label>
+            <label className="wa-check"><input type="checkbox" name="cancelOnCustomer" defaultChecked={s.cancelOnCustomer} /> {tr("Cancel the order in Shopify when the customer cancels")}</label>
+            <label className="wa-check"><input type="checkbox" name="cancelOnExpire" defaultChecked={s.cancelOnExpire} /> {tr("Cancel the order in Shopify when it expires")}</label>
+            <p className="wa-muted wa-small">{tr("Shipped orders and orders paid online are never cancelled. The customer isn't emailed.")}</p>
+          </fieldset>
         </Card>
 
         <Card title={tr("Abandoned checkouts")}>

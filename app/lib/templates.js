@@ -10,6 +10,11 @@ export const TEMPLATE_TYPES = {
     help: N_("Sent after a Cash on Delivery order. Include {confirm_link} so the order is tagged automatically."),
     vars: ["name", "order_no", "amount", "items", "store_name", "confirm_link", "order_status_link"],
   },
+  cod_reminder: {
+    label: N_("COD reminder"),
+    help: N_("Sent to customers who haven't confirmed their COD order yet (COD confirmation → To remind). Include {confirm_link}."),
+    vars: ["name", "order_no", "amount", "items", "store_name", "confirm_link", "order_status_link"],
+  },
   abandoned_cart: {
     label: N_("Abandoned checkout"),
     help: N_("Sent to shoppers who left checkout. Include {checkout_link}."),
@@ -72,6 +77,36 @@ export const DEFAULT_TEMPLATES = {
       "مرحبًا {name}، شكرًا لتسوقك من {store_name}! 🛍️\n\n" +
       "طلبك {order_no} بقيمة *{amount}* مسجَّل *بالدفع عند الاستلام*.\n\n" +
       "اضغط لتأكيد طلبك أو إلغائه:\n{confirm_link}",
+  },
+  cod_reminder: {
+    en:
+      "Hi {name}, a quick reminder from {store_name} 🙏\n\n" +
+      "Your Cash on Delivery order {order_no} (*{amount}*) is waiting for your confirmation. We ship it as soon as you confirm.\n\n" +
+      "Tap to confirm or cancel:\n{confirm_link}",
+    hi:
+      "नमस्ते {name}, {store_name} की ओर से एक छोटा-सा रिमाइंडर 🙏\n\n" +
+      "आपका कैश ऑन डिलीवरी ऑर्डर {order_no} (*{amount}*) आपके कन्फर्मेशन का इंतज़ार कर रहा है। कन्फर्म करते ही हम इसे भेज देंगे।\n\n" +
+      "कन्फर्म या कैंसल करने के लिए टैप करें:\n{confirm_link}",
+    es:
+      "Hola {name}, un recordatorio rápido de {store_name} 🙏\n\n" +
+      "Tu pedido contra reembolso {order_no} (*{amount}*) espera tu confirmación. Lo enviamos en cuanto confirmes.\n\n" +
+      "Toca para confirmar o cancelar:\n{confirm_link}",
+    "pt-BR":
+      "Olá {name}, um lembrete rápido da {store_name} 🙏\n\n" +
+      "Seu pedido com pagamento na entrega {order_no} (*{amount}*) está aguardando sua confirmação. Enviamos assim que você confirmar.\n\n" +
+      "Toque para confirmar ou cancelar:\n{confirm_link}",
+    fr:
+      "Bonjour {name}, un petit rappel de {store_name} 🙏\n\n" +
+      "Votre commande {order_no} (*{amount}*) en paiement à la livraison attend votre confirmation. Nous l'expédions dès que vous confirmez.\n\n" +
+      "Touchez pour confirmer ou annuler :\n{confirm_link}",
+    de:
+      "Hallo {name}, eine kurze Erinnerung von {store_name} 🙏\n\n" +
+      "Deine Nachnahme-Bestellung {order_no} (*{amount}*) wartet auf deine Bestätigung. Wir versenden sie, sobald du bestätigst.\n\n" +
+      "Hier tippen, um zu bestätigen oder zu stornieren:\n{confirm_link}",
+    ar:
+      "مرحبًا {name}، تذكير سريع من {store_name} 🙏\n\n" +
+      "طلبك {order_no} (*{amount}*) بالدفع عند الاستلام بانتظار تأكيدك. نشحنه فور تأكيدك.\n\n" +
+      "اضغط للتأكيد أو الإلغاء:\n{confirm_link}",
   },
   abandoned_cart: {
     en:
@@ -217,6 +252,10 @@ export const STARTER_TEMPLATES = {
     ],
     hi: [["छोटा", "नमस्ते {name} 👋 कृपया अपना COD ऑर्डर {order_no} (*{amount}*) कन्फर्म करें:\n{confirm_link}"]],
   },
+  cod_reminder: {
+    en: [["Short", "Hi {name}, just checking 🙂 Shall we ship your order {order_no} (*{amount}*)? Tap to confirm: {confirm_link}"]],
+    hi: [["छोटा", "नमस्ते {name} 🙂 क्या हम आपका ऑर्डर {order_no} (*{amount}*) भेज दें? कन्फर्म करने के लिए टैप करें: {confirm_link}"]],
+  },
   abandoned_cart: {
     en: [["With urgency", "Hi {name}, your cart at {store_name} is still waiting 🛒\n\n{items}\n\n_Items sell out fast._ Complete your order:\n{checkout_link}"]],
     hi: [],
@@ -235,7 +274,7 @@ export function validateTemplate({ type, lang, name, body }) {
   if (unknown.length) return `Unknown variable: ${unknown.map((u) => `{${u}}`).join(", ")}`;
   const notForType = [...text.matchAll(/\{([a-z_]+)\}/g)].map((m) => m[1]).filter((v) => !TEMPLATE_TYPES[type].vars.includes(v));
   if (notForType.length) return `${[...new Set(notForType)].map((v) => `{${v}}`).join(", ")} isn't available for ${TEMPLATE_TYPES[type].label} messages.`;
-  if (type === "cod_confirm" && !text.includes("{confirm_link}")) {
+  if ((type === "cod_confirm" || type === "cod_reminder") && !text.includes("{confirm_link}")) {
     return N_("Keep {confirm_link} in COD messages so customer replies are recorded automatically.");
   }
   return null;

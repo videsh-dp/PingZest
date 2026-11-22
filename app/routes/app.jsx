@@ -7,6 +7,7 @@ import { authenticate } from "../shopify.server";
 import { staffName } from "../lib/shop.js";
 import { syncPlan } from "../models/billing.server";
 import { navCounts } from "../models/orders.server";
+import { processDueCod } from "../models/cod-loop.server";
 import { NAV_SECTIONS, NAV_ITEMS } from "../lib/nav.js";
 import { adminLocale, dictionaryFor } from "../i18n/server.js";
 import { I18nProvider, useT } from "../i18n/react.jsx";
@@ -25,9 +26,11 @@ export const loader = async ({ request }) => {
   const locale = adminLocale({ request, session, settings });
   const profile = { plan: settings.plan || "free", app_locale: locale, country_code: settings.countryCode };
   identifyShop(session.shop, profile);
+  // Pro autopilot: expire unanswered COD orders that are due (throttled to every 10 minutes per shop).
+  await processDueCod(session.shop, admin, { limit: 20 }).catch((e) => console.error("COD autopilot failed", e?.message));
   const [flags, counts] = await Promise.all([
     getFlags(session.shop, { personProperties: { shop: session.shop, ...profile } }),
-    navCounts(session.shop, { delayMin: settings.abandonDelayMin }).catch(() => ({})),
+    navCounts(session.shop, { delayMin: settings.abandonDelayMin, settings }).catch(() => ({})),
   ]);
   return { apiKey: process.env.SHOPIFY_API_KEY || "", shop: session.shop, staff: staffName(session), locale, dict: dictionaryFor(locale), flags, plan: profile.plan, counts };
 };

@@ -6,7 +6,7 @@
  */
 import { N_ } from "../i18n/core.js";
 
-export const KINDS = { cod_confirm: N_("COD confirmation"), abandoned_cart: N_("Abandoned checkout"), shipped: N_("Shipped"), delivered: N_("Delivered") };
+export const KINDS = { cod_confirm: N_("COD confirmation"), cod_reminder: N_("COD reminder"), abandoned_cart: N_("Abandoned checkout"), shipped: N_("Shipped"), delivered: N_("Delivered") };
 
 const DAY = 86400000;
 export function dayRange(days, now = new Date()) {
@@ -30,8 +30,8 @@ export function computeMessageStats({ logs = [], orders = [], checkouts = [], te
   const inRange = (d) => d && new Date(d).toISOString().slice(0, 10) >= since;
 
   // messages per day, by stage
-  const daily = Object.fromEntries(range.map((d) => [d, { cod_confirm: 0, abandoned_cart: 0, shipped: 0, delivered: 0 }]));
-  const byKind = { cod_confirm: 0, abandoned_cart: 0, shipped: 0, delivered: 0 };
+  const daily = Object.fromEntries(range.map((d) => [d, Object.fromEntries(Object.keys(KINDS).map((k) => [k, 0]))]));
+  const byKind = Object.fromEntries(Object.keys(KINDS).map((k) => [k, 0]));
   for (const l of logs) {
     if (!(l.kind in byKind) || l.day < since) continue;
     byKind[l.kind] += 1;

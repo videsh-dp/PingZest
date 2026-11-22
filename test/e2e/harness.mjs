@@ -15,6 +15,7 @@ export const SECRET = process.env.SHOPIFY_API_SECRET || "ci-api-secret";
 export const SCOPES = process.env.SCOPES || "";
 export const CERT = process.env.E2E_CERT || "/tmp/e2e/cert.pem";
 export const KEY = process.env.E2E_KEY || "/tmp/e2e/key.pem";
+export const CRON_SECRET = process.env.CRON_SECRET || "e2e-cron-secret-0123456789";
 export const HOST_PARAM = Buffer.from(`admin.shopify.com/store/${SHOP.replace(".myshopify.com", "")}`).toString("base64url");
 // A real browser's user agent: Shopify's library answers 410 to requests that look like bots (Node's fetch does).
 export const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0 Safari/537.36";
@@ -72,7 +73,7 @@ export async function startApp({ port, log = `/tmp/pingzest-e2e-${port}.log` }) 
   const dev = process.env.E2E_SERVER === "dev";
   const cmd = dev ? ["react-router", "dev", "--port", String(port), "--strictPort"] : ["react-router-serve", "./build/server/index.js"];
   const server = spawn("npx", cmd, {
-    env: { ...process.env, PORT: String(port), SHOPIFY_APP_URL: BASE, NODE_EXTRA_CA_CERTS: CERT, POSTHOG_API_KEY: "", BILLING_TEST: "true", ...(dev ? { NODE_ENV: "development" } : {}) },
+    env: { ...process.env, PORT: String(port), SHOPIFY_APP_URL: BASE, NODE_EXTRA_CA_CERTS: CERT, POSTHOG_API_KEY: "", BILLING_TEST: "true", CRON_SECRET, ...(dev ? { NODE_ENV: "development" } : {}) },
     stdio: ["ignore", openSync(log, "w"), openSync(log, "a")],
   });
   await waitFor(`${BASE}/healthz`, dev ? 120000 : 60000);

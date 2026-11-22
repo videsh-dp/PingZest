@@ -10,7 +10,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
-import { SHOP, HOST_PARAM, UA, SECRET, prisma, sessionToken, codOrder, startApp } from "./harness.mjs";
+import { SHOP, HOST_PARAM, UA, SECRET, CRON_SECRET, prisma, sessionToken, codOrder, startApp } from "./harness.mjs";
 
 let app;
 let BASE;
@@ -26,6 +26,21 @@ function assertPage(r, label) {
 
 const opsSince = (n) => shopify.calls.slice(n).map((c) => c.op);
 const settings = () => prisma.shopSettings.findUnique({ where: { shop: SHOP } });
+const BASE_SETTINGS = { storeName: "Golibar", whatsappNumber: "98765 43210", countryCode: "91", defaultLang: "hi", appLocale: "auto", confirmedTag: "cod-yes", cancelledTag: "cod-no", abandonDelayMin: "45" };
+const LOOP_SETTINGS = { loopSettings: "1", codRemindHours: "24", codExpireHours: "72", noReplyTag: "cod-silent", cancelRestock: "on" };
+const HOUR = 3600e3;
+const orderRow = (o) => prisma.order.findFirst({ where: { shop: SHOP, shopifyOrderId: String(o.id) } });
+const confirmPost = (token, body) => fetch(`${BASE}/c/${token}`, { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body, redirect: "manual" });
+/** A COD order that arrived through the webhook and whose confirmation was sent `hoursAgo`. */
+async function sentCodOrder(hoursAgo = 0, overrides = {}) {
+  const o = codOrder(overrides);
+  shopify.state.orders.set(o.admin_graphql_api_id, {});
+  await webhook("/webhooks/orders", "orders/create", o);
+  const row = await orderRow(o);
+  await act("/app/cod", { intent: "sent", id: row.id, templateId: "", templateName: "Standard", lang: "en" });
+  await prisma.order.update({ where: { id: row.id }, data: { codSentAt: new Date(Date.now() - hoursAgo * HOUR) } });
+  return { o, row: await prisma.order.findUnique({ where: { id: row.id } }) };
+}
 const forcePlanCheck = () => prisma.shopSettings.updateMany({ where: { shop: SHOP }, data: { planCheckedAt: null } });
 
 before(async () => {
@@ -251,6 +266,110 @@ test("COD: an order without a phone in the webhook is fetched from Shopify", asy
   assert.equal(row.phone, "919811111111");
 });
 
+
+/* ---------- closing the COD loop (docs/TICKETS.md PZ-01..03) ---------- */
+
+test("COD loop (Free): fulfillment held on arrival and released when the customer confirms", async () => {
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS, codHold: "on" });
+  const s = await settings();
+  assert.equal(s.codHold, true);
+  assert.equal(s.noReplyTag, "cod-silent");
+  assert.equal(s.cancelRestock, true);
+  assert.equal(s.codAutoExpire, false, "autopilot fields ignored on Free");
+
+  const o = codOrder();
+  shopify.state.orders.set(o.admin_graphql_api_id, {});
+  let n = shopify.calls.length;
+  await webhook("/webhooks/orders", "orders/create", o);
+  assert.ok(opsSince(n).includes("codFulfillmentOrders") && opsSince(n).includes("holdFulfillmentOrder"), `hold calls (${opsSince(n).join(",")})`);
+  const hold = shopify.calls.slice(n).find((c) => c.op === "holdFulfillmentOrder").variables.fulfillmentHold;
+  assert.equal(hold.reason, "OTHER");
+  assert.equal(hold.notifyMerchant, false);
+  const row = await orderRow(o);
+  assert.ok(row.heldAt, "order marked held");
+  assert.equal(row.fulfillmentHolds.length, 1);
+  const fo = shopify.state.orders.get(o.admin_graphql_api_id).fulfillmentOrders[0];
+  assert.equal(fo.status, "ON_HOLD", "fulfillment order on hold in Shopify");
+  assert.match((await page("/app/cod")).html, /Fulfillment on hold/);
+
+  n = shopify.calls.length;
+  const post = await confirmPost(row.confirmToken, "choice=confirmed");
+  assert.ok(post.status < 400);
+  const release = shopify.calls.slice(n).find((c) => c.op === "releaseFulfillmentHold");
+  assert.deepEqual(release?.variables, { id: fo.id, holdIds: [row.fulfillmentHolds[0].hold] }, "only PingZest's hold is released");
+  assert.equal(fo.status, "OPEN");
+  assert.ok((await orderRow(o)).holdReleasedAt, "release recorded");
+});
+
+test("COD loop (Free): a failed hold shows on the order and Retry fixes it", async () => {
+  const o = codOrder();
+  shopify.state.orders.set(o.admin_graphql_api_id, {});
+  shopify.state.failNext = "holdFulfillmentOrder";
+  await webhook("/webhooks/orders", "orders/create", o);
+  const row = await orderRow(o);
+  assert.match(row.actionError || "", /^hold: Fake failure/, "error stored, webhook still answered");
+  assert.match((await page("/app/cod")).html, /Couldn(?:'|&#x27;|&#39;)t hold fulfillment/);
+  await act("/app/cod", { intent: "retry", id: row.id });
+  const after = await orderRow(o);
+  assert.ok(after.heldAt, "held on retry");
+  assert.equal(after.actionError, null, "alert cleared");
+});
+
+test("COD loop (Free): remind after 24h, expire by hand with the no-reply tag, cancel + restock in Shopify by hand", async () => {
+  const { o, row } = await sentCodOrder(25);
+  const remindTab = await page("/app/cod", { filter: "remind", lang: "en" });
+  assertPage(remindTab, "To remind tab");
+  assert.ok(remindTab.html.includes(o.name), "order listed in To remind");
+  assert.match(remindTab.html, /Send reminder/);
+  assert.match(remindTab.html, /quick%20reminder/, "WhatsApp link uses the reminder template");
+  const tpl = await prisma.messageTemplate.findFirst({ where: { shop: SHOP, type: "cod_reminder", lang: "en", isDefault: true } });
+  assert.ok(tpl, "standard reminder template seeded");
+  await act("/app/cod", { intent: "reminded", id: row.id, templateId: tpl.id, templateName: tpl.name, lang: "en" });
+  assert.ok((await orderRow(o)).codRemindedAt, "reminder recorded");
+  assert.ok(await prisma.messageLog.findFirst({ where: { shop: SHOP, refId: row.id, kind: "cod_reminder" } }), "reminder in message analytics");
+  assert.ok(!(await page("/app/cod", { filter: "remind" })).html.includes(o.name), "reminded orders leave To remind");
+
+  await prisma.order.update({ where: { id: row.id }, data: { codSentAt: new Date(Date.now() - 73 * HOUR) } });
+  assert.match((await page("/app/cod", { filter: "waiting" })).html, /Expire now/, "expiry due shown");
+  let n = shopify.calls.length;
+  await act("/app/cod", { intent: "status", id: row.id, status: "no_reply" });
+  const expired = await orderRow(o);
+  assert.equal(expired.codStatus, "no_reply");
+  assert.ok(expired.codExpiredAt);
+  assert.deepEqual(shopify.calls.slice(n).find((c) => c.op === "tagOrder")?.variables.tags, ["cod-silent"], "no-reply tag added");
+  assert.ok(!opsSince(n).includes("cancelOrder"), "Free never cancels on its own");
+
+  n = shopify.calls.length;
+  await act("/app/cod", { intent: "cancelShopify", id: row.id });
+  const cancel = shopify.calls.slice(n).find((c) => c.op === "cancelOrder");
+  assert.equal(cancel?.variables.orderId, o.admin_graphql_api_id);
+  assert.equal(cancel.variables.restock, true, "restocked (Settings)");
+  assert.equal(cancel.variables.reason, "OTHER");
+  assert.equal(cancel.variables.notifyCustomer, false);
+  assert.ok((await orderRow(o)).shopifyCancelledAt);
+  assert.ok(shopify.state.orders.get(o.admin_graphql_api_id).cancelledAt, "cancelled in Shopify");
+
+  n = shopify.calls.length;
+  await act("/app/cod", { intent: "cancelShopify", id: row.id });
+  assert.ok(!opsSince(n).includes("cancelOrder"), "never cancelled twice");
+
+  const view = await (await fetch(`${BASE}/c/${row.confirmToken}?l=en`)).text();
+  assert.match(view, /This order was cancelled/, "confirm page says it's cancelled");
+  assert.equal((await confirmPost(row.confirmToken, "choice=confirmed")).status, 400, "can't confirm a cancelled order");
+
+  // A shipped order is never cancelled.
+  const { o: o2, row: row2 } = await sentCodOrder(1);
+  await act("/app/cod", { intent: "status", id: row2.id, status: "cancelled" });
+  await prisma.order.update({ where: { id: row2.id }, data: { shippedAt: new Date() } });
+  n = shopify.calls.length;
+  await act("/app/cod", { intent: "cancelShopify", id: row2.id });
+  assert.ok(!opsSince(n).includes("cancelOrder"), "shipped order not cancelled");
+  assert.equal((await orderRow(o2)).shopifyCancelledAt, null);
+
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS }); // hold off again for the other tests
+  assert.equal((await settings()).codHold, false);
+});
+
 /* ---------- abandoned checkouts ---------- */
 
 test("Abandoned checkouts: webhook → queue after the delay → send, dismiss; completed checkout leaves", async () => {
@@ -413,6 +532,53 @@ test("Pro: customer fixes the address and pays online with a discount (order edi
   assert.ok(paid.convertedToPrepaid, "converted to prepaid");
   assert.deepEqual(shopify.calls.slice(n).find((c) => c.op === "tagOrder")?.variables.tags, ["now-prepaid", "cod-yes"], "prepaid + confirmed tags (paying counts as confirming)");
   assertPage(await page("/app/analytics"), "analytics with prepaid stats");
+});
+
+test("COD autopilot (Pro): expires unanswered orders on app load and by cron, cancels + restocks; customer cancel cancels", async () => {
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS, loopPro: "1", codAutoExpire: "on", cancelOnCustomer: "on", cancelOnExpire: "on" });
+  const s = await settings();
+  assert.equal(s.codAutoExpire, true);
+  assert.equal(s.cancelOnExpire, true);
+  assert.equal(s.cancelOnCustomer, true);
+
+  const { o, row } = await sentCodOrder(80);
+  await prisma.shopSettings.update({ where: { shop: SHOP }, data: { codProcessedAt: null } });
+  let n = shopify.calls.length;
+  assertPage(await page("/app"), "home runs the autopilot");
+  const expired = await orderRow(o);
+  assert.equal(expired.codStatus, "no_reply", "expired automatically");
+  assert.ok(expired.codExpiredAt);
+  assert.ok(expired.shopifyCancelledAt, "cancelled in Shopify (opt-in)");
+  assert.deepEqual(shopify.calls.slice(n).find((c) => c.op === "tagOrder")?.variables.tags, ["cod-silent"]);
+  const cancel = shopify.calls.slice(n).find((c) => c.op === "cancelOrder");
+  assert.equal(cancel?.variables.restock, true);
+  assert.equal(row.codStatus, "sent");
+
+  // Throttled: a second load within 10 minutes doesn't run it again.
+  const { o: o2 } = await sentCodOrder(80);
+  await page("/app");
+  assert.equal((await orderRow(o2)).codStatus, "sent", "throttled");
+
+  // The cron endpoint runs it for every Pro shop with the autopilot on (needs the secret).
+  assert.equal((await fetch(`${BASE}/cron/cod`, { method: "POST" })).status, 401);
+  assert.equal((await fetch(`${BASE}/cron/cod`, { method: "POST", headers: { Authorization: "Bearer wrong-secret-wrong-secret" } })).status, 401);
+  const cron = await fetch(`${BASE}/cron/cod`, { method: "POST", headers: { Authorization: `Bearer ${CRON_SECRET}` } });
+  assert.equal(cron.status, 200);
+  const summary = await cron.json();
+  assert.ok(summary.expired >= 1, `cron expired orders (${JSON.stringify(summary)})`);
+  assert.equal((await orderRow(o2)).codStatus, "no_reply", "expired by cron");
+
+  // Customer cancels on the confirm page → cancelled in Shopify straight away.
+  const { o: o3, row: row3 } = await sentCodOrder(1);
+  n = shopify.calls.length;
+  await confirmPost(row3.confirmToken, "choice=cancelled");
+  const c3 = shopify.calls.slice(n).find((c) => c.op === "cancelOrder");
+  assert.equal(c3?.variables.reason, "CUSTOMER");
+  assert.ok((await orderRow(o3)).shopifyCancelledAt);
+
+  // Turn the autopilot off again.
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS, loopPro: "1" });
+  assert.equal((await settings()).codAutoExpire, false);
 });
 
 test("Plan: cancel goes back to Free and the widget branding returns", async () => {

@@ -26,7 +26,8 @@ presses send. There's no Meta API, no Meta business verification and no per-mess
 | **Widget analytics** | Views, clicks, click rate per widget; clicks per day (7/30/90 days); mobile vs desktop; by page; discount funnel → orders and sales from your codes | App proxy |
 | **Login** | Merchants sign in with their **Shopify account** (OAuth / token exchange). Public landing + "Log in with Shopify" page, staff name shown, sign-out | – |
 | Admin | Dashboard, setup checklist, one-click theme editor links | – |
-| Admin | **COD confirmation queue** → Send / Waiting / Confirmed / Cancelled / No reply | Level 2 customer data |
+| Admin | **COD confirmation queue** → Send / Waiting / To remind / Confirmed / Cancelled / No reply | Level 2 customer data |
+| **COD follow-up** | Optional **fulfillment hold** on new COD orders, released on confirm; **reminder** list after X hours (own reminder template); **expire** after Y hours with a no-reply tag; one-click **cancel + restock in Shopify** for cancelled / unanswered orders; failed Shopify actions shown on the order with Retry | `write_merchant_managed_fulfillment_orders`, `write_orders` |
 | Admin | Abandoned checkout queue and order updates queue (shipped / delivered) | Level 2 customer data |
 | **Templates** | A built-in Standard template for every stage and language, plus **5 custom templates on the Free plan** (unlimited on Pro), one default per stage and language; formatting toolbar for what typed WhatsApp messages support (bold, italic, strikethrough, monospace, inline code, quote, lists), emoji, variables; phone-style preview rendered like WhatsApp; starter templates | – |
 | Queues | Template picker on each queue: switch templates and the messages update instantly | – |
@@ -70,7 +71,18 @@ Screenshots: [login](docs/screenshots/login.png) · [templates](docs/screenshots
 3. The link shows a preview card that looks like buttons (`public/og-confirm.png`).
 4. The customer taps it and chooses **Confirm** or **Cancel**. The order gets the `wa-cod-confirmed` or
    `wa-cod-cancelled` tag in Shopify, and the queue updates.
-5. The merchant filters cancelled orders in Shopify and cancels them before shipping. The app never cancels orders itself.
+5. **Follow-up** (Settings → Orders → COD follow-up, `app/models/cod-loop.server.js`):
+   - **Hold fulfillment** (opt-in): new COD orders are put on hold in Shopify (`fulfillmentOrderHold`) so nobody
+     ships them by mistake; the hold is released when the order is confirmed (customer, merchant or paid online).
+   - **To remind**: orders sent more than 24 h ago (setting) without a reply. "Send reminder" opens WhatsApp with the
+     *COD reminder* template.
+   - **Expire** after 72 h (setting): "Expire now" moves the order to No reply and adds the `wa-cod-no-reply` tag.
+   - **Cancel in Shopify**: one click cancels a cancelled or unanswered order in Shopify (`orderCancel`, restock on by
+     default, the customer isn't emailed). Shipped and paid orders are never cancelled.
+   - **Pro autopilot** (opt-in): expire automatically, and cancel + restock automatically when the customer cancels or
+     the order expires. There's no worker process: due work runs on COD webhooks and when the app opens (at most every
+     10 minutes per shop). For quiet stores, call `POST /cron/cod` with `Authorization: Bearer $CRON_SECRET` from any
+     scheduler (e.g. hourly cron on the server: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://your-app/cron/cod`).
 
 ## Languages
 
@@ -172,6 +184,7 @@ Prices and features are in `app/lib/plans.js`; Shopify bills the merchant on the
 | **COD risk score** (Low / Medium / High with reasons; filter; Shopify tag) | count only | ✓ |
 | **COD → prepaid** (confirm page: "pay online now and save X%") | – | ✓ |
 | **Address check** (confirm page: customer fixes the address or adds a landmark) | – | ✓ |
+| **COD follow-up**: fulfillment hold, reminders, expire, cancel + restock in Shopify | by hand | ✓ + **autopilot** |
 | "Powered by PingZest" in the chat popup | shown | hidden |
 
 - **Plan page** (`/app/plan`): compare, start the trial (Shopify's approval page), cancel.
@@ -303,6 +316,10 @@ docs/               SETUP.md, App Store checklist, privacy policy template, scre
 - **Consent:** the opt-in checkbox is unchecked by default, and cart reminders are limited to one per checkout.
 
 ## Known gaps (to do before launch)
+
+- **New scope (Nov 2026): `write_merchant_managed_fulfillment_orders`** for the COD fulfillment hold. Existing installs
+  are asked to approve it the next time they open the app; until then a hold fails and shows on the order as an alert.
+  Stores that fulfil only from third-party fulfillment-service locations would also need `write_third_party_fulfillment_orders` (not requested).
 
 - `customers/data_request` currently logs the data; send it to the merchant by email before launch.
 - The "Turn on" checklist steps can't detect whether the embed or blocks are enabled (needs the theme API).

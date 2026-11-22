@@ -6,6 +6,7 @@ import { orderRecordFromWebhook, checkoutRecordFromWebhook, trackingFromFulfillm
 import { generateToken, tokenExpiry } from "../lib/tokens.js";
 import { N_ } from "../i18n/core.js";
 import { COD_FILTERS } from "../lib/cod-filters.js";
+import { reminderWhere } from "../lib/cod-loop.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -64,11 +65,12 @@ export async function applyFulfillment(shop, payload) {
 
 export { COD_FILTERS };
 
-export async function codQueue(shop, filter = "todo", { risk = null } = {}) {
+export async function codQueue(shop, filter = "todo", { risk = null, settings = {} } = {}) {
   const f = COD_FILTERS[filter] || COD_FILTERS.todo;
+  const where = filter === "remind" ? reminderWhere(settings) : f.where;
   return prisma.order.findMany({
-    where: { shop, isCod: true, ...f.where, ...(risk ? { riskLevel: risk } : {}) },
-    orderBy: { createdAt: filter === "todo" ? "asc" : "desc" },
+    where: { shop, isCod: true, ...where, ...(risk ? { riskLevel: risk } : {}) },
+    orderBy: filter === "remind" ? { codSentAt: "asc" } : { createdAt: filter === "todo" ? "asc" : "desc" },
     take: 100,
   });
 }
@@ -110,6 +112,11 @@ export async function logSend(shop, { kind, refId, templateId, templateName = ""
   return prisma.messageLog.create({
     data: { shop, kind, refId, templateId: templateId || null, templateName, lang, day: new Date().toISOString().slice(0, 10) },
   });
+}
+
+/** A reminder was opened in WhatsApp (COD confirmation → To remind). */
+export async function markCodReminded(shop, id) {
+  return prisma.order.updateMany({ where: { id, shop, codStatus: "sent" }, data: { codRemindedAt: new Date() } });
 }
 
 export async function markCodSent(shop, id, templateId = null) {
@@ -158,15 +165,16 @@ export async function findByToken(token) {
 /* ---------- stats ---------- */
 
 /** Work waiting on each queue page, for the sidebar badges and tab counts. Same rules as the queues. */
-export async function navCounts(shop, { delayMin = 30 } = {}) {
+export async function navCounts(shop, { delayMin = 30, settings = {} } = {}) {
   const cutoff = new Date(Date.now() - delayMin * 60 * 1000);
-  const [cod, carts, shipped, delivered] = await Promise.all([
+  const [pending, remind, carts, shipped, delivered] = await Promise.all([
     prisma.order.count({ where: { shop, isCod: true, codStatus: "pending" } }),
+    prisma.order.count({ where: { shop, ...reminderWhere(settings) } }),
     prisma.checkout.count({ where: { shop, completed: false, phone: { not: null }, status: "pending", updatedAt: { lte: cutoff }, createdAt: { gte: new Date(Date.now() - 7 * DAY) } } }),
     prisma.order.count({ where: { shop, shippedAt: { not: null }, AND: [empty("shippedMsgSentAt")] } }),
     prisma.order.count({ where: { shop, deliveredAt: { not: null }, AND: [empty("deliveredMsgSentAt")] } }),
   ]);
-  return { cod, carts, updates: shipped + delivered, shipped, delivered };
+  return { cod: pending + remind, pending, remind, carts, updates: shipped + delivered, shipped, delivered };
 }
 
 export async function dashboardStats(shop) {

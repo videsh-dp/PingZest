@@ -5,10 +5,11 @@ import { riskTeaser } from "../models/risk.server";
 import { authenticate } from "../shopify.server";
 import { getSettings } from "../models/settings.server";
 import { listTemplates } from "../models/templates.server";
-import { codQueue, markCodSent, setCodStatus, logSend } from "../models/orders.server";
+import { codQueue, markCodSent, markCodReminded, setCodStatus, logSend } from "../models/orders.server";
+import { applyCodOutcome, expireOrder, cancelInShopify, releaseCodHold, holdCodOrder, retryAction, dismissActionError } from "../models/cod-loop.server";
+import { canCancelInShopify, nextStep, reminderWhere, isExpiryDue, parseActionError, ACTION_LABELS } from "../lib/cod-loop.js";
 import { COD_FILTERS } from "../lib/cod-filters.js";
 import { codRowData, templatesFor, pickLang } from "../models/messages.server";
-import { tagOrder, removeOrderTags } from "../models/shopify-admin.server";
 import { formatMoney } from "../lib/orders.js";
 import { useT } from "../i18n/react.jsx";
 
@@ -28,12 +29,16 @@ export const loader = async ({ request }) => {
   const settings = await getSettings(shop);
   const pro = hasFeature(planOf(settings), "codRisk");
   const risk = pro && ["high", "medium", "low"].includes(url.searchParams.get("risk")) ? url.searchParams.get("risk") : null;
-  const [templates, rows, counts, teaser] = await Promise.all([
+  const [templates, rows, counts, remindCount, teaser] = await Promise.all([
     listTemplates(shop),
-    codQueue(shop, filter, { risk }),
+    codQueue(shop, filter, { risk, settings }),
     prisma.order.groupBy({ by: ["codStatus"], where: { shop, isCod: true }, _count: { _all: true } }),
+    prisma.order.count({ where: { shop, ...reminderWhere(settings) } }),
     pro ? null : riskTeaser(shop),
   ]);
+  // The To remind tab sends the reminder message; every other tab the confirmation.
+  const templateType = filter === "remind" ? "cod_reminder" : "cod_confirm";
+  const now = new Date();
   const lang = pickLang(request, settings);
   const countBy = Object.fromEntries(counts.map((c) => [c.codStatus, c._count._all]));
   return {
@@ -41,10 +46,13 @@ export const loader = async ({ request }) => {
     pro,
     risk,
     teaser,
-    templates: templatesFor(templates, "cod_confirm"),
-    langs: [...new Set(templates.filter((t) => t.type === "cod_confirm").map((t) => t.lang))],
+    templateType,
+    autoExpire: Boolean(settings.codAutoExpire) && pro,
+    holdOn: Boolean(settings.codHold),
+    templates: templatesFor(templates, templateType),
+    langs: [...new Set(templates.filter((t) => t.type === templateType).map((t) => t.lang))],
     counts: {
-      todo: countBy.pending || 0, waiting: countBy.sent || 0, confirmed: countBy.confirmed || 0,
+      todo: countBy.pending || 0, waiting: countBy.sent || 0, remind: remindCount, confirmed: countBy.confirmed || 0,
       cancelled: countBy.cancelled || 0, no_reply: countBy.no_reply || 0,
     },
     rows: rows.map((o) => ({
@@ -61,6 +69,15 @@ export const loader = async ({ request }) => {
       risk: pro && o.riskLevel ? { level: o.riskLevel, score: o.riskScore, reasons: (o.riskReasons || []).slice(0, 3) } : null,
       paidOnline: o.convertedToPrepaid,
       addressFixed: Boolean(o.addressUpdatedAt),
+      held: Boolean(o.heldAt && !o.holdReleasedAt),
+      remindedAt: o.codRemindedAt,
+      expired: Boolean(o.codExpiredAt),
+      expiryDue: isExpiryDue(o, settings, now),
+      next: nextStep(o, settings),
+      shopifyCancelled: Boolean(o.shopifyCancelledAt),
+      canCancel: canCancelInShopify(o),
+      shipped: Boolean(o.shippedAt),
+      actionError: o.actionError ? parseActionError(o.actionError) : null,
       ...codRowData(o, settings),
     })),
   };
@@ -79,22 +96,46 @@ export const action = async ({ request }) => {
     await logSend(shop, { kind: "cod_confirm", refId: id, templateId, templateName: form.templateName, lang: form.lang });
     return { ok: true };
   }
+  if (form.intent === "reminded") {
+    await markCodReminded(shop, id);
+    await logSend(shop, { kind: "cod_reminder", refId: id, templateId: toId(form.templateId), templateName: form.templateName, lang: form.lang });
+    return { ok: true };
+  }
+  const settings = await getSettings(shop);
+  const order = await prisma.order.findFirst({ where: { id, shop, isCod: true } });
+  if (!order) return { error: "Not found" };
   if (form.intent === "status") {
-    const order = await setCodStatus(shop, id, form.status, "merchant");
-    const settings = await getSettings(shop);
-    if (order && form.status === "confirmed") {
-      await tagOrder(admin, order.orderGid, [settings.confirmedTag]);
-      await removeOrderTags(admin, order.orderGid, [settings.cancelledTag]);
-    } else if (order && form.status === "cancelled") {
-      await tagOrder(admin, order.orderGid, [settings.cancelledTag]);
-      await removeOrderTags(admin, order.orderGid, [settings.confirmedTag]);
+    // "No reply" is expiring the order by hand (tag + the opt-in cancel, like the autopilot).
+    if (form.status === "no_reply") {
+      await expireOrder(order, admin, settings, "merchant");
+      return { ok: true };
     }
+    const updated = await setCodStatus(shop, id, form.status, "merchant");
+    await applyCodOutcome(updated, { status: form.status, by: "merchant" }, admin, settings);
+    return { ok: true };
+  }
+  if (form.intent === "cancelShopify") return cancelInShopify(order, admin, settings);
+  if (form.intent === "release") {
+    await releaseCodHold(order, admin);
+    return { ok: true };
+  }
+  if (form.intent === "hold") {
+    await holdCodOrder({ ...order, heldAt: null }, admin, { ...settings, codHold: true });
+    return { ok: true };
+  }
+  if (form.intent === "retry") {
+    await retryAction(order, admin, settings);
+    return { ok: true };
+  }
+  if (form.intent === "dismissError") {
+    await dismissActionError(shop, id);
     return { ok: true };
   }
   return { ok: false };
 };
 
 const RISK_LABELS = { high: N_("High risk"), medium: N_("Medium risk"), low: N_("Low risk") };
+
 
 function RiskBadge({ risk }) {
   const tr = useT();
@@ -112,7 +153,7 @@ function RiskBadge({ risk }) {
 
 export default function CodQueue() {
   const tr = useT();
-  const { rows, counts, lang, templates, langs, pro, risk, teaser } = useLoaderData();
+  const { rows, counts, lang, templates, langs, pro, risk, teaser, autoExpire, holdOn } = useLoaderData();
   const { chosen, forLang, compose } = useQueueTemplate(templates, lang);
   const sendExtra = { templateId: chosen?.id ?? "", templateName: chosen?.name ?? "", lang };
   const [params] = useSearchParams();
@@ -123,7 +164,8 @@ export default function CodQueue() {
     return `?${p}`;
   };
   const tabs = Object.entries(COD_FILTERS).map(([id, f]) => ({ id, label: tr(f.label), count: counts[id] }));
-  const canSend = ["todo", "waiting", "no_reply"].includes(filter);
+  const canSend = ["todo", "waiting", "remind", "no_reply"].includes(filter);
+  const reminding = filter === "remind";
   const list = rows.map((row) => ({ ...row, ...compose(row) }));
 
   const columns = [
@@ -150,7 +192,22 @@ export default function CodQueue() {
           {r.paidOnline && <div><span className="wa-badge wa-badge--success">{tr("Paid online")}</span></div>}
           {r.addressFixed && <div className="wa-muted">{tr("Address updated by customer")}</div>}
           {r.sentAt && r.status === "sent" && <div className="wa-muted">{tr("sent {when}", { when: tr.ago(r.sentAt) })}</div>}
+          {r.remindedAt && r.status === "sent" && <div className="wa-muted">{tr("reminded {when}", { when: tr.ago(r.remindedAt) })}</div>}
           {r.respondedBy === "customer" && <div className="wa-muted">{tr("by customer")}</div>}
+          {r.expired && r.status === "no_reply" && <div className="wa-muted">{tr("expired without a reply")}</div>}
+          {r.status === "sent" && r.expiryDue && <div><span className="wa-badge wa-badge--attention">{tr("Expiry due")}</span></div>}
+          {r.status === "sent" && !r.expiryDue && r.next && (
+            <div className="wa-muted wa-small">
+              {r.next.kind === "remind" ? tr("Reminder due {when}", { when: tr.ago(r.next.at) }) : autoExpire ? tr("Expires automatically {when}", { when: tr.ago(r.next.at) }) : tr("Expiry due {when}", { when: tr.ago(r.next.at) })}
+            </div>
+          )}
+          {r.held && <div><span className="wa-badge wa-badge--info">{tr("Fulfillment on hold")}</span></div>}
+          {r.shopifyCancelled && <div><span className="wa-badge wa-badge--neutral">{tr("Cancelled in Shopify")}</span></div>}
+          {r.actionError && (
+            <div className="wa-error wa-small" role="alert">
+              {tr(ACTION_LABELS[r.actionError.kind] || ACTION_LABELS.other)}: {r.actionError.message}
+            </div>
+          )}
         </>
       ),
     },
@@ -158,14 +215,29 @@ export default function CodQueue() {
       key: "actions", label: tr("Actions"), align: "right",
       render: (r) => (
         <div className="wa-actions">
-          {(r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
+          {reminding && r.status === "sent" ? (
+            <SendButton link={r.link} intent="reminded" id={r.id} extra={sendExtra} label={tr("Send reminder")} />
+          ) : (r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
             <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? tr("Send on WhatsApp") : tr("Send again")} />
           )}
           {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
           {r.status !== "cancelled" && (
             <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText={tr("Mark this order as cancelled by the customer?")}>{tr("Cancelled")}</ActionButton>
           )}
-          {r.status === "sent" && <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }}>{tr("No reply")}</ActionButton>}
+          {r.status === "sent" && (
+            <ActionButton intent="status" id={r.id} extra={{ status: "no_reply" }} confirmText={r.expiryDue ? null : tr("Expire this order now? It moves to No reply and gets the no-reply tag.")}>
+              {r.expiryDue ? tr("Expire now") : tr("No reply")}
+            </ActionButton>
+          )}
+          {r.canCancel && (
+            <ActionButton intent="cancelShopify" id={r.id} tone="critical" confirmText={tr("Cancel this order in Shopify? Items go back in stock if that's on in Settings. The customer isn't emailed.")}>
+              {tr("Cancel in Shopify")}
+            </ActionButton>
+          )}
+          {r.held && ["pending", "sent"].includes(r.status) && <ActionButton intent="release" id={r.id}>{tr("Release hold")}</ActionButton>}
+          {holdOn && !r.held && !r.shipped && ["pending", "sent"].includes(r.status) && <ActionButton intent="hold" id={r.id}>{tr("Hold fulfillment")}</ActionButton>}
+          {r.actionError && <ActionButton intent="retry" id={r.id}>{tr("Retry")}</ActionButton>}
+          {r.actionError && <ActionButton intent="dismissError" id={r.id}>{tr("Dismiss")}</ActionButton>}
         </div>
       ),
     },
@@ -204,14 +276,15 @@ export default function CodQueue() {
             </>
           }
           empty={
-            <EmptyState icon={filter === "todo" ? "🎉" : "✓"} title={filter === "todo" ? tr("All caught up 🎉") : tr("Nothing here yet")}>
-              {filter === "todo" ? tr("New COD orders appear here automatically.") : null}
+            <EmptyState icon={filter === "todo" || reminding ? "🎉" : "✓"} title={filter === "todo" || reminding ? tr("All caught up 🎉") : tr("Nothing here yet")}>
+              {filter === "todo" ? tr("New COD orders appear here automatically.") : reminding ? tr("Orders waiting longer than the reminder time (Settings → Orders) appear here.") : null}
             </EmptyState>
           }
         />
       </Card>
       <p className="wa-muted wa-footnote">
-        {tr("Confirmed and cancelled orders get the tags set in Settings, so you can filter them in Shopify Orders. PingZest doesn't cancel orders for you.")}
+        {tr("Confirmed, cancelled and unanswered orders get the tags set in Settings, so you can filter them in Shopify Orders. PingZest cancels an order in Shopify only when you press Cancel in Shopify, or automatically if you turned that on (Pro).")}{" "}
+        <Link to="/app/settings?tab=orders">{tr("COD follow-up settings")}</Link>
       </p>
     </Page>
   );

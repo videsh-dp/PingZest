@@ -1,6 +1,8 @@
 import prisma from "../db.server";
 import { normalizePhone } from "../lib/phone.js";
 import { LOCALES, N_ } from "../i18n/core.js";
+import { loopTimers } from "../lib/cod-loop.js";
+import { hasFeature, planOf } from "../lib/plans.js";
 
 export async function getSettings(shop) {
   return prisma.shopSettings.upsert({ where: { shop }, update: {}, create: { shop } });
@@ -32,6 +34,25 @@ export async function saveSettings(shop, form) {
     cancelledTag: tag(form.cancelledTag, "wa-cod-cancelled"),
     abandonDelayMin,
   };
+  // COD follow-up (Settings → Orders). Checkboxes only count when that part of the form was sent.
+  if (form.loopSettings) {
+    const { remindHours, expireHours } = loopTimers({ codRemindHours: form.codRemindHours, codExpireHours: form.codExpireHours });
+    Object.assign(data, {
+      codHold: form.codHold === "on",
+      codRemindHours: remindHours,
+      codExpireHours: expireHours,
+      noReplyTag: tag(form.noReplyTag, "wa-cod-no-reply"),
+      cancelRestock: form.cancelRestock === "on",
+    });
+    // Automation is Pro: those fields are disabled (so not sent) on Free, and ignored if sent anyway.
+    if (form.loopPro && hasFeature(planOf(await getSettings(shop)), "codAutomation")) {
+      Object.assign(data, {
+        codAutoExpire: form.codAutoExpire === "on",
+        cancelOnCustomer: form.cancelOnCustomer === "on",
+        cancelOnExpire: form.cancelOnExpire === "on",
+      });
+    }
+  }
   // Pro settings are only sent when the shop is on Pro (the fields are disabled otherwise).
   if (form.proSettings) {
     const num = (v, min, max, fallback) => {

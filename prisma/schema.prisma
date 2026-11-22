@@ -57,6 +57,17 @@ model ShopSettings {
   confirmedTag     String   @default("wa-cod-confirmed")
   cancelledTag     String   @default("wa-cod-cancelled")
   abandonDelayMin  Int      @default(30)
+  // Closing the COD loop (docs/TICKETS.md PZ-01..03)
+  codHold          Boolean  @default(false) // hold fulfillment of new COD orders until confirmed
+  codRemindHours   Int      @default(24)    // "To remind" after this long without a reply
+  codExpireHours   Int      @default(72)    // expire (No reply) after this long
+  noReplyTag       String   @default("wa-cod-no-reply")
+  codAutoExpire    Boolean  @default(false) // Pro: expire automatically
+  cancelOnCustomer Boolean  @default(false) // Pro: cancel in Shopify when the customer cancels
+  cancelOnExpire   Boolean  @default(false) // Pro: cancel in Shopify when an order expires
+  cancelRestock    Boolean  @default(true)  // restock items when PingZest cancels an order
+  codProcessedAt   DateTime? // last time due COD work ran for this shop (throttle)
+  rtoCost          Float?   // average cost of one returned COD parcel; null = default for the currency
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 }
@@ -64,7 +75,7 @@ model ShopSettings {
 model MessageTemplate {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   shop      String
-  type      String // cod_confirm | abandoned_cart | shipped | delivered
+  type      String // cod_confirm | cod_reminder | abandoned_cart | shipped | delivered
   lang      String // any app language code (en, hi, es, pt-BR, fr, de, ar)
   name      String
   body      String
@@ -80,7 +91,7 @@ model MessageTemplate {
 model MessageLog {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   shop         String
-  kind         String // cod_confirm | abandoned_cart | shipped | delivered
+  kind         String // cod_confirm | cod_reminder | abandoned_cart | shipped | delivered
   refId        String   @db.ObjectId // Order.id or Checkout.id
   templateId   String?  @db.ObjectId
   templateName String   @default("")
@@ -134,6 +145,21 @@ model Order {
   convertedToPrepaid Boolean   @default(false)
   addressUpdatedAt   DateTime? // customer fixed the address on the confirm page
 
+  // Closing the COD loop
+  fulfillmentHolds   Json?     // [{ fo, hold }] fulfillment orders PingZest put on hold
+  heldAt             DateTime?
+  holdReleasedAt     DateTime?
+  codRemindedAt      DateTime? // reminder opened in WhatsApp
+  codExpiredAt       DateTime? // moved to No reply after the expiry time (by PingZest or the merchant)
+  shopifyCancelledAt DateTime? // cancelled in Shopify by PingZest
+  actionError        String?   // last failed Shopify action: "hold: <message>" (shown as an alert)
+  actionErrorAt      DateTime?
+
+  // Returns analytics (RTO)
+  firstOrder         Boolean?  // customer's first order in the store
+  placedHour         Int?      // hour of day the order was placed, store's local time (0-23)
+  rtoAt              DateTime? // merchant marked the parcel as returned to origin
+
   // Order updates
   trackingUrl        String?
   shippedAt          DateTime?
@@ -149,6 +175,7 @@ model Order {
   @@index([shop, isCod, riskLevel])
   @@index([shop, phone])
   @@index([shop, pincode])
+  @@index([shop, isCod, codStatus, codSentAt])
   @@index([confirmToken])
 }
 
