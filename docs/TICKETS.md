@@ -12,6 +12,11 @@ Each ticket was checked against the code on `overnight-e2e` (Nov 22, 2026) befor
 - Phone numbers are normalised with the default country code (`app/lib/phone.js`).
 - Risk score, COD → prepaid and address check are on Pro.
 
+**Progress (Nov 22, 2026):**
+- **Done on branch `research-features`:** PZ-01 to PZ-08.
+- **New scope to approve:** `write_merchant_managed_fulfillment_orders`.
+- **Optional env var:** `CRON_SECRET`, for `POST /cron/cod`.
+
 Effort: **S** = up to 2 days, **M** = 1–3 weeks, **L** = 1–2 months (one developer).
 Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blocked by a dependency) · **Needs decision** (reserved for the owner).
 
@@ -111,7 +116,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - The counting rules are a pure function with unit tests.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-01 and PZ-03 for the action errors.
-- **Status:** Done (commit "Alerts for stuck work…").
+- **Status:** Done (e92feea).
 
 ### PZ-08 · Phone-number health on the COD queue
 - **Problem:** in R1 §1 job 8, half the broadcasts failed because of missing country codes.
@@ -120,7 +125,7 @@ Status: **To do** · **In progress** · **Done** (with commit) · **Later** (blo
   - Counted in PZ-07.
 - **Plan:** Free. **Effort:** S.
 - **Dependencies:** PZ-07.
-- **Status:** Done (commit "Alerts for stuck work…").
+- **Status:** Done (e92feea).
 
 ### PZ-09 · In-app review ask after the first savings milestone
 - **Problem:** reviews drive ranking against the new COD apps, which have 0 reviews (R2 Move 6).
