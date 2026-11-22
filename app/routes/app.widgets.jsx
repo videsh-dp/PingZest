@@ -62,7 +62,7 @@ export const action = async ({ request }) => {
   const form = await request.formData();
   if (form.get("intent") === "embedStatus") {
     const now = new Date();
-    await prisma.shopSettings.update({ where: { shop: session.shop }, data: form.get("active") === "1" ? { embedActiveAt: now, embedCheckedAt: now } : { embedCheckedAt: now } });
+    await prisma.shopSettings.update({ where: { shop: session.shop }, data: form.get("active") === "1" ? { embedActiveAt: now, embedCheckedAt: now } : { embedActiveAt: null, embedCheckedAt: now } });
     return { embedChecked: true };
   }
   if (form.get("intent") === "translate") {

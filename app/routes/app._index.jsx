@@ -102,7 +102,7 @@ export const action = async ({ request }) => {
     // Theme app embed status read in the browser with App Bridge (shopify.app.extensions()).
     case "embedStatus": {
       const now = new Date();
-      return set(form.active === "1" ? { embedActiveAt: now, embedCheckedAt: now } : { embedCheckedAt: now });
+      return set(form.active === "1" ? { embedActiveAt: now, embedCheckedAt: now } : { embedActiveAt: null, embedCheckedAt: now });
     }
     case "embedManual": return set({ embedManual: form.on === "1" });
     default: return { ok: false };

@@ -238,7 +238,8 @@ test("theme app embed status from App Bridge's app.extensions()", async () => {
   assert.equal(embedActivation([]), null);
   const now = Date.now();
   assert.equal(embedOn({ embedActiveAt: new Date(now - 60e3), embedCheckedAt: new Date(now - 60e3) }, now), true);
-  assert.equal(embedOn({ embedActiveAt: new Date(now - 3600e3), embedCheckedAt: new Date(now - 60e3) }, now), false, "latest check said off");
+  assert.equal(embedOn({ embedActiveAt: null, embedCheckedAt: new Date(now - 60e3) }, now), false, "latest check said off");
+  assert.equal(embedOn({ embedActiveAt: new Date(now - 8 * 864e5) }, now), false, "too old");
   assert.equal(embedOn({ embedManual: true }, now), true);
   assert.equal(embedOn({}, now), false);
 });
