@@ -10,6 +10,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createHmac, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { SHOP, HOST_PARAM, UA, SECRET, CRON_SECRET, prisma, sessionToken, codOrder, startApp } from "./harness.mjs";
 
 let app;
@@ -80,6 +81,23 @@ test("every admin page renders", async () => {
     assertPage(await page(path), path);
   }
   for (const l of ["hi", "ar", "es"]) assertPage(await page("/app/settings", { locale: l }), `settings in ${l}`);
+});
+
+test("every admin page in all 7 languages: translated sidebar, lang attribute, right-to-left for Arabic", async () => {
+  const PAGES = ["/app", "/app/cod", "/app/carts", "/app/updates", "/app/widgets", "/app/discounts", "/app/templates", "/app/analytics", "/app/settings", "/app/plan"];
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/'/g, "&#x27;");
+  for (const l of ["en", "hi", "es", "pt-BR", "fr", "de", "ar"]) {
+    const dict = l === "en" ? {} : JSON.parse(readFileSync(`app/i18n/locales/${l}.json`, "utf8"));
+    for (const path of PAGES) {
+      const r = await page(path, { locale: l });
+      assertPage(r, `${path} in ${l}`);
+      assert.ok(r.html.includes(`lang="${l}" dir="${l === "ar" ? "rtl" : "ltr"}"`), `${path} in ${l}: lang and direction`);
+      for (const key of ["Abandoned checkouts", "Message templates"]) {
+        const text = dict[key] || key;
+        assert.ok(r.html.includes(text) || r.html.includes(esc(text)), `${path} in ${l}: sidebar shows "${text}"`);
+      }
+    }
+  }
 });
 
 /* ---------- settings ---------- */
@@ -301,6 +319,36 @@ test("COD loop (Free): fulfillment held on arrival and released when the custome
   assert.ok((await orderRow(o)).holdReleasedAt, "release recorded");
 });
 
+test("COD loop (Free): Release hold and Hold fulfillment buttons; Dismiss clears a failed-action alert", async () => {
+  await act("/app/settings", { ...BASE_SETTINGS, ...LOOP_SETTINGS, codHold: "on" });
+  const o = codOrder();
+  shopify.state.orders.set(o.admin_graphql_api_id, {});
+  await webhook("/webhooks/orders", "orders/create", o);
+  const row = await orderRow(o);
+  assert.ok(row.heldAt);
+  assert.match((await page("/app/cod")).html, /Release hold/);
+  let n = shopify.calls.length;
+  await act("/app/cod", { intent: "release", id: row.id });
+  assert.ok(opsSince(n).includes("releaseFulfillmentHold"));
+  assert.ok((await orderRow(o)).holdReleasedAt, "released by hand");
+  const fo = shopify.state.orders.get(o.admin_graphql_api_id).fulfillmentOrders[0];
+  assert.equal(fo.status, "OPEN");
+
+  // Hold again by hand (the order is pending and not shipped).
+  await prisma.order.update({ where: { id: row.id }, data: { holdReleasedAt: null, heldAt: null } });
+  n = shopify.calls.length;
+  await act("/app/cod", { intent: "hold", id: row.id });
+  assert.ok(opsSince(n).includes("holdFulfillmentOrder"));
+  assert.equal(fo.status, "ON_HOLD");
+
+  shopify.state.failNext = "releaseFulfillmentHold";
+  await act("/app/cod", { intent: "release", id: row.id });
+  assert.match((await orderRow(o)).actionError || "", /^release: /);
+  await act("/app/cod", { intent: "dismissError", id: row.id });
+  assert.equal((await orderRow(o)).actionError, null, "dismissed");
+  await act("/app/cod", { intent: "status", id: row.id, status: "cancelled" });
+});
+
 test("COD loop (Free): a failed hold shows on the order and Retry fixes it", async () => {
   const o = codOrder();
   shopify.state.orders.set(o.admin_graphql_api_id, {});
@@ -352,6 +400,16 @@ test("COD loop (Free): remind after 24h, expire by hand with the no-reply tag, c
   n = shopify.calls.length;
   await act("/app/cod", { intent: "cancelShopify", id: row.id });
   assert.ok(!opsSince(n).includes("cancelOrder"), "never cancelled twice");
+
+  // Cancelled in Shopify is final: the merchant can't mark it confirmed again (that tagged a cancelled order).
+  n = shopify.calls.length;
+  await act("/app/cod", { intent: "status", id: row.id, status: "confirmed" });
+  assert.equal((await orderRow(o)).codStatus, "no_reply", "status kept after the Shopify cancel");
+  assert.ok(!opsSince(n).includes("tagOrder"), "no confirmed tag on a cancelled order");
+  const noReplyTab = (await page("/app/cod", { filter: "no_reply" })).html;
+  const card = noReplyTab.slice(noReplyTab.indexOf(o.name), noReplyTab.indexOf(o.name) + 4000);
+  assert.match(card, /Cancelled in Shopify/);
+  assert.doesNotMatch(card.split("</tr>")[0], /Mark confirmed|Send again/, "no status or send buttons on a cancelled order");
 
   const view = await (await fetch(`${BASE}/c/${row.confirmToken}?l=en`)).text();
   assert.match(view, /This order was cancelled/, "confirm page says it's cancelled");
@@ -562,6 +620,8 @@ test("Plan: upgrade starts Shopify's approval; approved subscription turns on Pr
   });
   assert.equal(wh.status, 200);
   assert.equal((await settings()).plan, "pro");
+  const proWidget = JSON.parse(shopify.state.metafields.at(-1).value);
+  assert.equal(proWidget.branding, false, "plan change re-syncs the storefront widget without “Powered by PingZest”");
   await forcePlanCheck();
   assertPage(await page("/app/plan", { upgraded: "1" }), "plan (pro)");
   assert.equal((await settings()).plan, "pro", "billing.check agrees");
@@ -586,7 +646,11 @@ test("Pro: risk score tags high-risk COD orders in Shopify", async () => {
   assert.equal(row.riskLevel, "high", `risk level (${row.riskLevel}, score ${row.riskScore})`);
   const tag = shopify.calls.slice(n).find((c) => c.op === "tagOrder");
   assert.deepEqual(tag?.variables.tags, ["risky"], "high-risk tag added");
-  assertPage(await page("/app/cod", { risk: "high" }), "COD risk filter");
+  const high = await page("/app/cod", { risk: "high" });
+  assertPage(high, "COD risk filter");
+  assert.ok(high.html.includes(risky.name), "risky order under High risk");
+  assert.match(high.html, /High risk/);
+  assert.ok(!(await page("/app/cod", { risk: "low" })).html.includes(risky.name), "not under Low risk");
 });
 
 test("Pro: customer fixes the address and pays online with a discount (order edit) → prepaid", async () => {
@@ -693,6 +757,7 @@ test("Plan: cancel goes back to Free and the widget branding returns", async () 
   await act("/app/plan", { intent: "cancel" });
   assert.ok(shopify.calls.slice(n).some((c) => /appSubscriptionCancel/.test(c.query)), "appSubscriptionCancel called");
   assert.equal((await settings()).plan, "free");
+  assert.equal(JSON.parse(shopify.state.metafields.at(-1).value).branding, true, "branding back on the storefront widget");
   assertPage(await page("/app/plan"), "plan after cancel");
   assertPage(await page("/app/settings"), "settings on Free (Pro fields disabled)");
 });

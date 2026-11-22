@@ -107,6 +107,8 @@ export const action = async ({ request }) => {
   const order = await prisma.order.findFirst({ where: { id, shop, isCod: true } });
   if (!order) return { error: "Not found" };
   if (form.intent === "status") {
+    // An order cancelled in Shopify is final: confirming it again would tag a cancelled order and release its hold.
+    if (order.shopifyCancelledAt) return { error: "This order was cancelled in Shopify." };
     // "No reply" is expiring the order by hand (tag + the opt-in cancel, like the autopilot).
     if (form.status === "no_reply") {
       await expireOrder(order, admin, settings, "merchant");
@@ -227,13 +229,13 @@ export default function CodQueue() {
       key: "actions", label: tr("Actions"), align: "right",
       render: (r) => (
         <div className="wa-actions">
-          {reminding && r.status === "sent" ? (
+          {r.shopifyCancelled ? null : reminding && r.status === "sent" ? (
             <SendButton link={r.link} intent="reminded" id={r.id} extra={sendExtra} label={tr("Send reminder")} />
           ) : (r.status === "pending" || r.status === "sent" || r.status === "no_reply") && (
             <SendButton link={r.link} intent="sent" id={r.id} extra={sendExtra} label={r.status === "pending" ? tr("Send on WhatsApp") : tr("Send again")} />
           )}
-          {r.status !== "confirmed" && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
-          {r.status !== "cancelled" && (
+          {r.status !== "confirmed" && !r.shopifyCancelled && <ActionButton intent="status" id={r.id} extra={{ status: "confirmed" }}>{tr("Mark confirmed")}</ActionButton>}
+          {r.status !== "cancelled" && !r.shopifyCancelled && (
             <ActionButton intent="status" id={r.id} extra={{ status: "cancelled" }} tone="critical" confirmText={tr("Mark this order as cancelled by the customer?")}>{tr("Cancelled")}</ActionButton>
           )}
           {r.status === "sent" && (

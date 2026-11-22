@@ -14,7 +14,7 @@ concurrency:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     env:
       DATABASE_URL: mongodb://localhost:27017/pingzest_ci?replicaSet=rs0&directConnection=true
       SHOPIFY_API_KEY: ci-api-key
@@ -112,6 +112,24 @@ jobs:
       - name: "End-to-end in the browser: sidebar, every page, settings form, mobile menu, confirm page"
         run: E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run test:e2e:browser
 
+      - name: "Demo videos: Free and Pro walkthroughs recorded in the browser (MP4)"
+        run: |
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+          E2E_ADMIN_SCHEMA=/tmp/e2e/admin-schema.json npm run demo:video
+
+      - name: Demo videos (base64, for copying out of the log)
+        if: always()
+        run: |
+          for f in test/e2e/demo/*.mp4; do
+            [ -f "$f" ] || continue
+            n=0; base64 -w 4000 "$f" | while read -r chunk; do n=$((n+1)); echo "VIDEO $(basename "$f") $n $chunk"; done
+          done
+          true
+
+      - name: Demo server log (on failure)
+        if: failure()
+        run: tail -200 /tmp/pingzest-demo.log 2>/dev/null || true
+
       - name: Screenshots for review (small JPEGs, base64)
         if: always()
         run: |
@@ -137,6 +155,7 @@ jobs:
           path: |
             test/widgets/*.png
             test/e2e/screenshots/*.png
+            test/e2e/demo/*.mp4
           if-no-files-found: ignore
 
   # Deploys main to your server after all tests pass. Turned on by setting the repository
