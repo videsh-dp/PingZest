@@ -325,7 +325,7 @@ export default function Index() {
                 <span>{tr("Remind after {remind} h · expire after {expire} h", { remind: status.remindHours, expire: status.expireHours })}{status.autoExpire ? ` · ${tr("automatic")}` : ""}</span>
               </li>
               <li data-status="widgets">
-                <span className={`wa-dot wa-dot--${status.embed ? "on" : status.embedChecked ? "off" : "unknown"}`} aria-hidden="true" />
+                <span className={`wa-dot wa-dot--${status.embed ? "on" : status.embedChecked ? "warn" : "unknown"}`} aria-hidden="true" />
                 <span>{status.embed ? tr("Store widgets are live") : status.embedChecked ? tr("Store widgets are off") : tr("Store widgets: not checked yet")}</span>
                 {!status.embed && <a href={embedLink} target="_top" className="wa-small">{tr("Turn on")}</a>}
               </li>

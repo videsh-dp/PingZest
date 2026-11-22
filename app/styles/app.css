@@ -583,3 +583,10 @@ ui-save-bar:defined .wa-savebar__label { display: none; }
 .wa-timeline__item--critical .wa-timeline__dot { border-color: var(--wa-critical); }
 .wa-timeline__text { font-weight: 550; }
 .wa-timeline__fix { margin-top: 6px; }
+@media (max-width: 760px) {
+  .wa-tabs { gap: 0; }
+  .wa-tab, .wa-tabs > button.wa-tab { padding: 10px 8px; font-size: 13px; }
+  .wa-tabmore .wa-menu { inset-inline-start: auto; inset-inline-end: 0; }
+}
+.wa-dot--off { background: #b5b5b5; }
+.wa-dot--warn { background: #e8a200; }
