@@ -22,13 +22,14 @@ tar -xzf "/tmp/pingzest-$SHA.tgz" -C "$DIR"
 rm -f "/tmp/pingzest-$SHA.tgz"
 cd "$DIR"
 
-echo "▶ Installing production packages"
-npm install --omit=dev --no-audit --no-fund --loglevel=error
+echo "▶ Installing production packages (exact versions from package-lock.json)"
+npm ci --omit=dev --no-audit --no-fund --loglevel=error
 
 echo "▶ Database: generate client, create collections and indexes"
-set -a; . "$APP_DIR/shared/.env"; set +a
-npx prisma generate >/dev/null
-npx prisma db push --skip-generate
+# node --env-file reads the .env like the app does. Do NOT `source` it: an unquoted "&" in a MongoDB URL
+# (…?retryWrites=true&w=majority) would cut the value and DATABASE_URL would come out empty.
+node --env-file="$APP_DIR/shared/.env" node_modules/.bin/prisma generate >/dev/null
+node --env-file="$APP_DIR/shared/.env" node_modules/.bin/prisma db push --skip-generate
 
 echo "▶ Switching to $SHA"
 ln -sfn "$DIR" "$APP_DIR/current"

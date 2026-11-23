@@ -45,11 +45,12 @@ SHOPIFY_API_KEY=...            # Client ID
 SHOPIFY_API_SECRET=...         # Client secret
 SHOPIFY_APP_URL=https://app.yourdomain.com
 SHOPIFY_APP_HANDLE=pingzest
-SCOPES=read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_app_proxy
+SCOPES=read_orders,write_orders,read_fulfillments,read_discounts,write_discounts,read_locales,write_order_edits,write_merchant_managed_fulfillment_orders,write_app_proxy
 DATABASE_URL=mongodb+srv://user:pass@cluster0.xxxx.mongodb.net/pingzest?retryWrites=true&w=majority
 POSTHOG_API_KEY=phc_...
 POSTHOG_HOST=https://us.i.posthog.com
 BILLING_TEST=true              # false when you go live
+CRON_SECRET=...                # 16+ random characters: lets the server cron run the COD autopilot for quiet stores
 ```
 
 ## 3. Connect GitHub (once)
@@ -82,3 +83,16 @@ curl -s localhost:3000/healthz  # {"ok":true} when the app and MongoDB answer
 
 Optional: once SSL works you can turn Cloudflare's proxy on (orange cloud) with SSL mode **Full (strict)**
 for free DDoS protection and caching.
+
+## Before real merchants: backups and monitoring
+
+- **Backups.** Atlas M0 (free) has **no automatic backups**. Either move to M10 (Cloud Backup) once you have paying
+  stores, or run a nightly `mongodump --uri "$DATABASE_URL" --gzip --archive=/var/backups/pingzest-$(date +%F).gz`
+  from cron and copy it off the server. Test a restore once.
+- **Uptime alert.** Add a free UptimeRobot/Better Stack check on `https://app.yourdomain.com/healthz` (it also
+  checks MongoDB) with an email or phone alert.
+- **COD autopilot schedule.** `setup-server.sh` adds a 15-minute cron that calls `/cron/cod` with a generated
+  `CRON_SECRET`. On a server set up earlier, add `CRON_SECRET=<16+ random characters>` to `.env` and a cron line
+  `*/15 * * * * curl -fsS -X POST -H "Authorization: Bearer <secret>" http://127.0.0.1:3000/cron/cod`.
+- **`.env` values** may contain `&` (Atlas URLs do): the app and release script read the file safely, but never
+  `source` it in a shell.

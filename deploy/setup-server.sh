@@ -57,6 +57,20 @@ sudo -u "$DEPLOY_USER" pm2 set pm2-logrotate:max_size 10M >/dev/null || true
 sudo -u "$DEPLOY_USER" pm2 set pm2-logrotate:retain 7 >/dev/null || true
 env PATH="$PATH:/usr/bin" pm2 startup systemd -u "$DEPLOY_USER" --hp /home/$DEPLOY_USER >/dev/null
 
+log "COD autopilot schedule (every 15 minutes, keeps quiet stores on time)"
+ENV_FILE="$APP_DIR/shared/.env"
+if ! grep -q '^CRON_SECRET=' "$ENV_FILE"; then
+  echo "CRON_SECRET=$(head -c 24 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 32)" >> "$ENV_FILE"
+fi
+cat > "$APP_DIR/shared/cron-cod.sh" <<'CRONSH'
+#!/usr/bin/env bash
+# Called by cron: asks the local app to run the COD autopilot. The secret never leaves the server.
+secret=$(grep '^CRON_SECRET=' /var/www/pingzest/shared/.env | cut -d= -f2-)
+curl -fsS -m 60 -X POST -H "Authorization: Bearer $secret" http://127.0.0.1:3000/cron/cod >/dev/null
+CRONSH
+chmod 700 "$APP_DIR/shared/cron-cod.sh" && chown "$DEPLOY_USER":"$DEPLOY_USER" "$APP_DIR/shared/cron-cod.sh" "$ENV_FILE"
+( sudo -u "$DEPLOY_USER" crontab -l 2>/dev/null | grep -v cron-cod.sh; echo "*/15 * * * * $APP_DIR/shared/cron-cod.sh" ) | sudo -u "$DEPLOY_USER" crontab -
+
 log "nginx"
 curl -fsSL "$REPO_RAW/deploy/nginx/pingzest-proxy.conf" -o /etc/nginx/snippets/pingzest-proxy.conf
 curl -fsSL "$REPO_RAW/deploy/nginx/pingzest.conf" | sed "s/DOMAIN/$DOMAIN/g" > /etc/nginx/sites-available/pingzest

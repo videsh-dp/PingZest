@@ -182,7 +182,7 @@ jobs:
           NODE_ENV: production
 
       - name: Package release
-        run: tar -czf /tmp/pingzest-${{ github.sha }}.tgz build package.json prisma ecosystem.config.cjs deploy public
+        run: tar -czf /tmp/pingzest-${{ github.sha }}.tgz build package.json package-lock.json prisma ecosystem.config.cjs deploy public
 
       - name: Upload and release on the server
         env:
