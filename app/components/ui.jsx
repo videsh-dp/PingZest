@@ -583,10 +583,11 @@ export function SaveBar({ id, dirty, saving = false, onSave, onDiscard, saveDisa
   const blocker = useBlocker(({ currentLocation, nextLocation }) => guard && !saving && currentLocation.pathname + currentLocation.search !== nextLocation.pathname + nextLocation.search);
   return (
     <>
-      <ui-save-bar id={id} data-open={dirty && guard ? "true" : "false"}>
+      {/* App Bridge allows only <button> children here ("Unexpected tag" otherwise), so the fallback bar's
+          "Unsaved changes" label comes from data-label via CSS. */}
+      <ui-save-bar id={id} data-open={dirty && guard ? "true" : "false"} data-label={tr("Unsaved changes")}>
         <button type="button" variant="primary" onClick={onSave} disabled={saveDisabled || saving || undefined} loading={saving ? "" : undefined}>{saving ? tr("Saving…") : tr("Save")}</button>
         <button type="button" onClick={onDiscard} disabled={saving || undefined}>{tr("Discard")}</button>
-        <span className="wa-savebar__label">{tr("Unsaved changes")}</span>
       </ui-save-bar>
       <ConfirmModal
         open={blocker.state === "blocked"}
